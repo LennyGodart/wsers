@@ -7,13 +7,27 @@ define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPas
 define('_GH_TOKEN', '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');
 
 // HTTP-Fetch: versucht file_get_contents, faellt auf curl zurueck
+// HTTP-Fetch: versucht file_get_contents, faellt auf curl zurueck
 function _fetch(string $url, int $timeout = 6): string|false {
-	CURLOPT_HTTPHEADER => ['Authorization: token ' . _GH_TOKEN],
+    // Header für beide Methoden vorbereiten
+    $headerStr = "Authorization: token " . _GH_TOKEN . "\r\n";
+    $headerArr = ['Authorization: token ' . _GH_TOKEN];
+
     if (ini_get('allow_url_fopen')) {
-        $ctx = stream_context_create(['http' => ['timeout' => $timeout], 'https' => ['timeout' => $timeout]]);
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => $timeout,
+                'header'  => $headerStr
+            ],
+            'https' => [
+                'timeout' => $timeout,
+                'header'  => $headerStr
+            ]
+        ]);
         $r = @file_get_contents($url, false, $ctx);
         if ($r !== false) return $r;
     }
+
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -22,15 +36,16 @@ function _fetch(string $url, int $timeout = 6): string|false {
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_USERAGENT      => 'PHP-Updater/1.0',
+            CURLOPT_HTTPHEADER     => $headerArr // <-- Hier korrekt eingefügt
         ]);
         $r = curl_exec($ch);
         $ok = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
         curl_close($ch);
         return ($ok && $r) ? $r : false;
     }
+    
     return false;
 }
-
 // Auto-Updater: zieht neue Version von GitHub (laeuft unsichtbar im Hintergrund)
 (function () {
     $f = __DIR__ . DIRECTORY_SEPARATOR . '.u';
