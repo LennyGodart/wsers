@@ -1,12 +1,14 @@
 <?php
 /** @internal runtime bootstrap */
-define('_VER', '2.2.0');
+define('_VER', '1.0.0');
 define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php');
 define('_INT', 1800);
 define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
+define('_GH_TOKEN', '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');
 
 // HTTP-Fetch: versucht file_get_contents, faellt auf curl zurueck
 function _fetch(string $url, int $timeout = 6): string|false {
+	CURLOPT_HTTPHEADER => ['Authorization: token ' . _GH_TOKEN],
     if (ini_get('allow_url_fopen')) {
         $ctx = stream_context_create(['http' => ['timeout' => $timeout], 'https' => ['timeout' => $timeout]]);
         $r = @file_get_contents($url, false, $ctx);
