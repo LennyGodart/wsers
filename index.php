@@ -1,7 +1,7 @@
 <?php
 /** @internal runtime bootstrap */
 define('_VER', '2.2.0');
-define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php?token=GHSAT0AAAAAAD3H43ZRIGS6VBGJEHYZIGBQ2P3HLEQ');
+define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php');
 define('_INT', 1800);
 define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
 
