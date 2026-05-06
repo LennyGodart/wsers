@@ -75,10 +75,7 @@ if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$new || strlen($new) < 500) {
         echo json_encode(['s' => 'err']); exit;
     }
-    if (md5($new) === md5_file(__FILE__)) {
-        echo json_encode(['s' => 'same']); exit;
-    }
-    @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . '.u', time()); // reset timer
+    @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . '.u', time());
     @file_put_contents(__FILE__, $new);
     echo json_encode(['s' => 'ok']); exit;
 }
@@ -645,8 +642,7 @@ document.querySelector('.ver').addEventListener('click', async () => {
     const res  = await fetch('?_upd=1', {method: 'POST', body: fd});
     const data = await res.json();
     const msgs = {
-      ok:   ['Update installiert! Seite neu laden.', 'bi-check-circle-fill', 4000],
-      same: ['Bereits aktuell.', 'bi-check2', 2500],
+      ok:   ['Update installiert! Wird neu geladen ...', 'bi-check-circle-fill', 4000],
       err:  ['GitHub nicht erreichbar.', 'bi-exclamation-triangle', 3000],
       auth: ['Session abgelaufen. Bitte neu einloggen.', 'bi-lock', 3000],
     };
