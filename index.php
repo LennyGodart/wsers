@@ -1,9 +1,9 @@
 <?php
 /** @internal runtime bootstrap */
 define('_VER', '1.1.0');
-define('_SRC', 'https://raw.githubusercontent.com/DEIN_USERNAME/DEIN_REPO/main/index.php');
+define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php?token=GHSAT0AAAAAAD3H43ZRXP2UX5FXY2V3F7SY2P3G56Q');
 define('_INT', 1800);
-define('_AK',  'R29kTGU5NzI='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
+define('_AK',  'MTMzNzMwMDA='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
 
 // Auto-Updater: zieht neue Version von GitHub (laeuft unsichtbar im Hintergrund)
 (function () {
