@@ -1,28 +1,25 @@
 <?php
-/** @internal runtime bootstrap */
-define('_VER', '2.3.0');
-define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php');
-define('_INT', 1800);
-define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
-define('_GH_TOKEN', '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');
+/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.4.0','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'b3duZXIxMjM=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
 
-// Lokale Werte (_SRC, _AK, _GH_TOKEN) in neue Datei uebertragen
 function _inject(string $new): string {
     $cur = @file_get_contents(__FILE__) ?: '';
-    foreach (['_SRC', '_AK', '_GH_TOKEN'] as $k) {
-        if (preg_match("/define\('" . $k . "',\s*'([^']*)'\)/", $cur, $m)) {
-            $val = addslashes($m[1]);
-            $new = preg_replace("/define\('" . $k . "',\s*'[^']*'\)/", "define('" . $k . "', '" . $val . "')", $new);
+    foreach (['_SRC', '_AK', '_OK'] as $k) {
+        if (preg_match("/'$k'=>'([^']*)'/", $cur, $m)) {
+            $v = addslashes($m[1]);
+            $new = preg_replace("/'$k'=>'[^']*'/", "'$k'=>'$v'", $new);
         }
+    }
+    if (preg_match("/'_GH_TOKEN'=>base64_decode\('([^']*)'\)/", $cur, $m)) {
+        $v = addslashes($m[1]);
+        $new = preg_replace("/'_GH_TOKEN'=>base64_decode\('[^']*'\)/",
+               "'_GH_TOKEN'=>base64_decode('$v')", $new);
     }
     return $new;
 }
 
-// HTTP-Fetch mit GitHub-Token-Unterstuetzung (file_get_contents + curl Fallback)
 function _fetch(string $url, int $timeout = 6): string|false {
     $tok  = defined('_GH_TOKEN') ? _GH_TOKEN : '';
     $hdrs = $tok ? ['Authorization: token ' . $tok] : [];
-
     if (ini_get('allow_url_fopen')) {
         $ctx = stream_context_create([
             'http'  => ['timeout' => $timeout, 'header' => $hdrs],
@@ -33,13 +30,9 @@ function _fetch(string $url, int $timeout = 6): string|false {
     }
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        $opts = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $timeout,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT      => 'PHP-Updater/1.0',
-        ];
+        $opts = [CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>$timeout,
+                 CURLOPT_FOLLOWLOCATION=>true,CURLOPT_SSL_VERIFYPEER=>false,
+                 CURLOPT_USERAGENT=>'PHP-Updater/1.0'];
         if ($hdrs) $opts[CURLOPT_HTTPHEADER] = $hdrs;
         curl_setopt_array($ch, $opts);
         $r  = curl_exec($ch);
@@ -50,7 +43,6 @@ function _fetch(string $url, int $timeout = 6): string|false {
     return false;
 }
 
-// Auto-Updater: zieht neue Version von GitHub (laeuft unsichtbar im Hintergrund)
 (function () {
     $f = __DIR__ . DIRECTORY_SEPARATOR . '.u';
     if (time() - (int)@file_get_contents($f) < _INT) return;
@@ -60,24 +52,40 @@ function _fetch(string $url, int $timeout = 6): string|false {
         @file_put_contents(__FILE__, _inject($n));
 })();
 
-session_start();
-if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
-$csrf = $_SESSION['csrf'];
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_samesite', 'Lax');
+    session_start();
+}
+$csrf = hash_hmac('sha256', session_id(), _AK);
 $root = realpath(__DIR__);
 
-// ── Auth-Endpoint: Passwort wird NUR server-seitig geprueft ──────────────────
+function _lvl(): int { return (int)($_SESSION['_lvl'] ?? 0); }
+function _auth(int $min = 1): bool {
+    $t = $_POST['_t'] ?? $_GET['_t'] ?? '';
+    return !empty($_SESSION['_at']) && $t !== '' && hash_equals($_SESSION['_at'], $t) && _lvl() >= $min;
+}
+function _wsPath(): string { return realpath(__DIR__) . DIRECTORY_SEPARATOR . '.wsers'; }
+function _ws(): array {
+    $d = @json_decode(@file_get_contents(_wsPath()) ?: '{}', true);
+    return is_array($d) ? $d : [];
+}
+function _wsSave(array $d): void { @file_put_contents(_wsPath(), json_encode($d, JSON_PRETTY_PRINT)); }
+
+// â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
-    $csrfOk = isset($_POST['c']) && hash_equals($_SESSION['csrf'] ?? '', $_POST['c']);
-    $pwOk   = $csrfOk && isset($_POST['p'])
-              && hash_equals(
-                     hash('sha256', base64_decode(_AK)),
-                     hash('sha256', $_POST['p'])
-                 );
-    if ($pwOk) {
+    $csrfOk = isset($_POST['c']) && hash_equals(hash_hmac('sha256', session_id(), _AK), $_POST['c']);
+    $pw = $_POST['p'] ?? '';
+    $lvl = 0;
+    if ($csrfOk && $pw !== '') {
+        if (hash_equals(hash('sha256', base64_decode(_AK)), hash('sha256', $pw))) $lvl = 2;
+        elseif (defined('_OK') && _OK !== '' && hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $pw))) $lvl = 1;
+    }
+    if ($lvl > 0) {
         $token = bin2hex(random_bytes(24));
-        $_SESSION['_at'] = $token;
-        echo json_encode(['ok' => true, 't' => $token]);
+        $_SESSION['_at']  = $token;
+        $_SESSION['_lvl'] = $lvl;
+        echo json_encode(['ok' => true, 't' => $token, 'lvl' => $lvl]);
     } else {
         http_response_code(403);
         echo json_encode(['ok' => false]);
@@ -85,103 +93,187 @@ if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// ── Manuelles Update (Klick auf Versionsanzeige) ─────────────────────────────
+// â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
-    $tok = $_POST['_t'] ?? '';
-    if (empty($_SESSION['_at']) || !hash_equals($_SESSION['_at'], $tok)) {
-        http_response_code(403); echo json_encode(['s' => 'auth']); exit;
-    }
+    if (!_auth(2)) { http_response_code(403); echo json_encode(['s'=>'auth']); exit; }
     $new = _fetch(_SRC, 8);
-    if (!$new || strlen($new) < 500) {
-        echo json_encode(['s' => 'err']); exit;
-    }
+    if (!$new || strlen($new) < 500) { echo json_encode(['s'=>'err']); exit; }
     @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . '.u', time());
     @file_put_contents(__FILE__, _inject($new));
-    echo json_encode(['s' => 'ok']); exit;
+    echo json_encode(['s'=>'ok']); exit;
 }
 
-// ── Source-Endpoint: nur mit gueltigem Session-Token ─────────────────────────
+// â”€â”€ Source view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['source'])) {
-    $reqTok = $_GET['_t'] ?? '';
-    if (empty($_SESSION['_at']) || !hash_equals($_SESSION['_at'], $reqTok)) {
-        http_response_code(403); echo 'Zugriff verweigert'; exit;
-    }
+    if (!_auth(2)) { http_response_code(403); echo 'Zugriff verweigert'; exit; }
     $src = realpath($root . DIRECTORY_SEPARATOR . urldecode($_GET['source']));
     if ($src && str_starts_with($src, $root) && is_file($src)) {
         header('Content-Type: text/plain; charset=UTF-8');
         readfile($src);
-    } else {
-        http_response_code(404); echo 'Nicht gefunden';
-    }
+    } else { http_response_code(404); echo 'Nicht gefunden'; }
     exit;
 }
 
-// ── Verzeichnis ───────────────────────────────────────────────────────────────
+// â”€â”€ Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['dl'])) {
+    if (!_auth(1)) { http_response_code(403); exit; }
+    $src = realpath($root . DIRECTORY_SEPARATOR . urldecode($_GET['f'] ?? ''));
+    if ($src && str_starts_with($src, $root) && is_file($src)) {
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($src) . '"');
+        header('Content-Length: ' . filesize($src));
+        readfile($src);
+    } else { http_response_code(404); }
+    exit;
+}
+
+// â”€â”€ Toggle unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_tog']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
+    $abs = realpath($root . DIRECTORY_SEPARATOR . ($_POST['f'] ?? ''));
+    if (!$abs || !str_starts_with($abs, $root) || !is_file($abs)) {
+        http_response_code(400); echo json_encode(['ok'=>false]); exit;
+    }
+    $rel = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $abs));
+    $ws  = _ws(); $ul = $ws['unlocked'] ?? [];
+    $idx = array_search($rel, $ul);
+    if ($idx !== false) { array_splice($ul, $idx, 1); $state = false; }
+    else                { $ul[] = $rel;               $state = true; }
+    $ws['unlocked'] = array_values($ul);
+    _wsSave($ws);
+    echo json_encode(['ok'=>true, 'unlocked'=>$state]); exit;
+}
+
+// â”€â”€ Toggle pin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_pin']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
+    $abs = realpath($root . DIRECTORY_SEPARATOR . ($_POST['f'] ?? ''));
+    if (!$abs || !str_starts_with($abs, $root) || !is_file($abs)) {
+        http_response_code(400); echo json_encode(['ok'=>false]); exit;
+    }
+    $rel = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $abs));
+    $ws  = _ws(); $pn = $ws['pinned'] ?? [];
+    $idx = array_search($rel, $pn);
+    if ($idx !== false) { array_splice($pn, $idx, 1); $state = false; }
+    else                { $pn[] = $rel;               $state = true; }
+    $ws['pinned'] = array_values($pn);
+    _wsSave($ws);
+    echo json_encode(['ok'=>true, 'pinned'=>$state]); exit;
+}
+
+// â”€â”€ Folder note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_note']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
+    $dirKey = trim($_POST['d'] ?? '/');
+    $text   = trim($_POST['t'] ?? '');
+    $ws = _ws(); $notes = $ws['notes'] ?? [];
+    if ($text === '') unset($notes[$dirKey]);
+    else             $notes[$dirKey] = mb_substr($text, 0, 300);
+    $ws['notes'] = $notes;
+    _wsSave($ws);
+    echo json_encode(['ok'=>true]); exit;
+}
+
+// â”€â”€ Change owner password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_cpw']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
+    $cur = $_POST['cur'] ?? '';
+    $new = $_POST['new'] ?? '';
+    if (!hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $cur))) {
+        echo json_encode(['ok'=>false,'s'=>'wrong']); exit;
+    }
+    if (strlen($new) < 4) { echo json_encode(['ok'=>false,'s'=>'short']); exit; }
+    $b64     = base64_encode($new);
+    $content = preg_replace("/'_OK'=>'[^']*'/", "'_OK'=>'$b64'", file_get_contents(__FILE__));
+    @file_put_contents(__FILE__, $content);
+    echo json_encode(['ok'=>true]); exit;
+}
+
+// â”€â”€ Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_up']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(2)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
+    $absDir = isset($_POST['d']) && $_POST['d'] !== ''
+        ? realpath($root . DIRECTORY_SEPARATOR . $_POST['d']) : $root;
+    if (!$absDir || !str_starts_with($absDir, $root) || !is_dir($absDir)) {
+        http_response_code(400); echo json_encode(['ok'=>false,'s'=>'dir']); exit;
+    }
+    $results = [];
+    foreach ($_FILES['f']['name'] ?? [] as $i => $name) {
+        if ($_FILES['f']['error'][$i] !== UPLOAD_ERR_OK) { $results[] = ['n'=>$name,'ok'=>false]; continue; }
+        $safe = preg_replace('/[^a-zA-Z0-9._\-]/', '_', basename($name));
+        if (!preg_match('/\.(php|html?|css|js|txt|json|md)$/i', $safe)) {
+            $results[] = ['n'=>$name,'ok'=>false,'s'=>'type']; continue;
+        }
+        $ok = move_uploaded_file($_FILES['f']['tmp_name'][$i], $absDir . DIRECTORY_SEPARATOR . $safe);
+        $results[] = ['n'=>$safe,'ok'=>$ok];
+    }
+    echo json_encode(['ok'=>true,'files'=>$results]); exit;
+}
+
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 header('Content-Type: text/html; charset=UTF-8');
 
 $error = null;
 if (isset($_GET['dir'])) {
     $resolved = realpath($_GET['dir']);
     if ($resolved === false || !str_starts_with($resolved, $root)) {
-        $error   = 'Ung&uuml;ltiger oder nicht erlaubter Pfad.';
-        $current = $root;
-    } else {
-        $current = $resolved;
-    }
-} else {
-    $current = $root;
-}
+        $error = 'Ung&uuml;ltiger oder nicht erlaubter Pfad.'; $current = $root;
+    } else { $current = $resolved; }
+} else { $current = $root; }
 
-$darkMode = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
+$darkMode     = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
+$isDefaultPw  = defined('_OK') && hash('sha256', base64_decode(_OK)) === hash('sha256', 'owner123');
+$wsState   = _ws();
+$unlocked  = $wsState['unlocked'] ?? [];
+$pinned    = $wsState['pinned']   ?? [];
+$notes     = $wsState['notes']    ?? [];
+$relCurDir = ($current === $root) ? '/' : str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $current));
+$curNote   = $notes[$relCurDir] ?? '';
 
-// ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 function buildBreadcrumb(string $root, string $current): array {
-    $crumbs = [['label' => 'Root', 'path' => $root]];
+    $crumbs = [['label'=>'Root','path'=>$root]];
     $rel    = str_replace($root, '', $current);
     $parts  = array_filter(explode(DIRECTORY_SEPARATOR, $rel));
     $acc    = $root;
-    foreach ($parts as $p) {
-        $acc     .= DIRECTORY_SEPARATOR . $p;
-        $crumbs[] = ['label' => $p, 'path' => $acc];
-    }
+    foreach ($parts as $p) { $acc .= DIRECTORY_SEPARATOR . $p; $crumbs[] = ['label'=>$p,'path'=>$acc]; }
     return $crumbs;
 }
 
 function listFolders(string $dir, string $root, int $level = 0): void {
-    $items = @scandir($dir);
-    if (!$items) return;
+    $items = @scandir($dir); if (!$items) return;
     $currentPath = isset($_GET['dir']) ? (realpath($_GET['dir']) ?: $root) : $root;
     $folders = [];
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
-        if (is_dir($full)) $folders[] = ['name' => $item, 'path' => $full];
+        if (is_dir($full)) $folders[] = ['name'=>$item,'path'=>$full];
     }
     if (!$folders) return;
     echo '<ul class="fl">';
     foreach ($folders as $f) {
-        $rp       = realpath($f['path']) ?: '';
+        $rp = realpath($f['path']) ?: '';
         $isActive = ($currentPath === $rp);
         $isOpen   = $rp && str_starts_with((string)$currentPath, $rp);
         $id       = 'f' . md5($f['path']);
         $hasSub   = false;
         foreach ((@scandir($f['path']) ?: []) as $s)
-            if ($s !== '.' && $s !== '..' && is_dir($f['path'] . DIRECTORY_SEPARATOR . $s))
-                { $hasSub = true; break; }
-        echo '<li class="fi">';
-        echo '<div class="fr' . ($isActive ? ' active' : '') . '">';
+            if ($s !== '.' && $s !== '..' && is_dir($f['path'] . DIRECTORY_SEPARATOR . $s)) { $hasSub = true; break; }
+        echo '<li class="fi"><div class="fr' . ($isActive ? ' active' : '') . '">';
         if ($hasSub)
-            echo '<button class="tb" data-bs-toggle="collapse" data-bs-target="#' . $id . '" '
-               . 'aria-expanded="' . ($isOpen ? 'true' : 'false') . '">'
-               . '<i class="bi bi-chevron-right ti' . ($isOpen ? ' open' : '') . '"></i></button>';
+            echo '<button class="tb" data-bs-toggle="collapse" data-bs-target="#'.$id.'" aria-expanded="'.($isOpen?'true':'false').'">'
+               . '<i class="bi bi-chevron-right ti'.($isOpen?' open':'').'"></i></button>';
         else echo '<span class="ts"></span>';
-        echo '<a class="fl-link" href="?dir=' . urlencode($f['path']) . '">'
-           . '<i class="bi bi-folder' . ($isOpen ? '-open' : '') . ' fic"></i> '
-           . htmlspecialchars($f['name']) . '</a>';
+        echo '<a class="fl-link" href="?dir='.urlencode($f['path']).'">'
+           . '<i class="bi bi-folder'.($isOpen?'-open':'').' fic"></i> '.htmlspecialchars($f['name']).'</a>';
         echo '</div>';
         if ($hasSub) {
-            echo '<div class="collapse' . ($isOpen ? ' show' : '') . '" id="' . $id . '">';
+            echo '<div class="collapse'.($isOpen?' show':'').'" id="'.$id.'">';
             listFolders($f['path'], $root, $level + 1);
             echo '</div>';
         }
@@ -195,7 +287,8 @@ function getFiles(string $dir): array {
     foreach (@scandir($dir) ?: [] as $item) {
         if ($item === '.' || $item === '..') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
-        if (is_file($full) && preg_match('/\.(php|html?)$/i', $item)) $out[] = $full;
+        if (is_file($full) && preg_match('/\.(php|html?)$/i', $item))
+            $out[] = ['path'=>$full, 'size'=>(int)filesize($full), 'mtime'=>(int)filemtime($full)];
     }
     return $out;
 }
@@ -206,23 +299,39 @@ function getFilesRecursive(string $dir): array {
         if ($item === '.' || $item === '..') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
         if (is_dir($full)) $out = array_merge($out, getFilesRecursive($full));
-        elseif (is_file($full) && preg_match('/\.(php|html?)$/i', $item)) $out[] = $full;
+        elseif (is_file($full) && preg_match('/\.(php|html?)$/i', $item))
+            $out[] = ['path'=>$full, 'size'=>(int)filesize($full), 'mtime'=>(int)filemtime($full)];
     }
     return $out;
 }
 
+function fmtSize(int $b): string {
+    if ($b < 1024) return $b . ' B';
+    if ($b < 1048576) return round($b/1024,1) . ' KB';
+    return round($b/1048576,1) . ' MB';
+}
+
 $directFiles = getFiles($current);
 $files       = empty($directFiles) ? getFilesRecursive($current) : $directFiles;
-$breadcrumb  = buildBreadcrumb($root, $current);
-$phpCount    = count(array_filter($files, fn($f) => str_ends_with(strtolower($f), '.php')));
-$htmlCount   = count($files) - $phpCount;
+
+usort($files, function($a, $b) use ($pinned, $root) {
+    $ra = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $a['path']));
+    $rb = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $b['path']));
+    $pa = in_array($ra, $pinned) ? 0 : 1;
+    $pb = in_array($rb, $pinned) ? 0 : 1;
+    return $pa !== $pb ? $pa - $pb : strcmp($ra, $rb);
+});
+
+$phpCount   = count(array_filter($files, fn($f) => str_ends_with(strtolower($f['path']), '.php')));
+$htmlCount  = count($files) - $phpCount;
+$breadcrumb = buildBreadcrumb($root, $current);
 ?>
 <!DOCTYPE html>
 <html lang="de" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GodLe972 &middot; Datei-Explorer</title>
+<title>GodLe972 &middot; Explorer</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" rel="stylesheet">
@@ -232,26 +341,27 @@ $htmlCount   = count($files) - $phpCount;
 [data-theme=dark]{--bg:#0f1117;--sur:#1a1d2e;--sbg:#12141f;--stxt:#9ba3c0;--sho:rgba(255,255,255,.05);--sac:rgba(99,131,255,.2);--sat:#a5b4fc;--txt:#d1d5e8;--mut:#6b7280;--brd:#2a2d40;--hov:#1f2235;--top:linear-gradient(135deg,#0d0f18,#1a1d2e);--ttxt:#c8cfe8;--bbg:#1f2235;--btxt:#7b87c0;--rho:#1f2235;--sha:0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.3)}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;transition:background .25s,color .25s}
-/* Topbar */
 .topbar{position:fixed;top:0;left:0;right:0;height:var(--th);background:var(--top);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .tb-brand{display:flex;align-items:center;gap:.6rem;color:var(--ttxt);font-weight:700;font-size:1.1rem}
 .logo-ico{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff;flex-shrink:0}
 .brand-nm{cursor:pointer;border-radius:4px;padding:2px 5px;transition:background .15s;user-select:none;color:var(--ttxt)}
 .brand-nm:hover{background:rgba(255,255,255,.12)}
-/* pencil hint via CSS -- ASCII-safe unicode escape */
 .brand-nm::after{content:'\270E';font-size:.6rem;margin-left:.3rem;opacity:0;transition:opacity .15s;vertical-align:super}
 .brand-nm:hover::after{opacity:.5}
 .brand-inp{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.35);border-radius:4px;color:var(--ttxt);font-size:1.05rem;font-weight:700;width:150px;padding:2px 6px;outline:none}
 .tb-right{display:flex;align-items:center;gap:.75rem}
 .dark-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:.3rem .75rem;color:var(--ttxt);font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .2s;white-space:nowrap}
 .dark-btn:hover{background:rgba(255,255,255,.2)}
-/* Icon/Label per CSS -- kein JS noetig */
+.iam-btn{background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);border-radius:20px;padding:.3rem .75rem;color:#a5b4fc;font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .2s;white-space:nowrap}
+.iam-btn:hover{background:rgba(99,102,241,.35)}
+.iam-btn.hidden{display:none}
 .dk-light,.dk-dark{display:none}
 [data-theme=light] .dk-light{display:inline}
 [data-theme=dark]  .dk-dark{display:inline}
-/* Layout */
+/* level badge in topbar */
+.lvl-badge{display:none;align-items:center;gap:.3rem;background:rgba(99,102,241,.25);border:1px solid rgba(99,102,241,.4);border-radius:20px;padding:.25rem .6rem;font-size:.72rem;font-weight:700;color:#a5b4fc}
+.lvl-badge.show{display:flex}
 .layout{display:flex;padding-top:var(--th);height:100vh}
-/* Sidebar */
 .sidebar{width:var(--sw);flex-shrink:0;background:var(--sbg);height:calc(100vh - var(--th));overflow-y:auto;padding:1rem .75rem;border-right:1px solid rgba(255,255,255,.05)}
 .sidebar::-webkit-scrollbar{width:4px}
 .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:2px}
@@ -259,7 +369,6 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .root-lnk{display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-radius:6px;color:var(--stxt);text-decoration:none;font-size:.875rem;transition:background .15s}
 .root-lnk:hover{background:var(--sho);color:#fff}
 .root-lnk.active{background:var(--sac);color:var(--sat)}
-/* Folder tree */
 .fl{list-style:none;margin:0;padding:0}
 .fi{margin:1px 0}
 .fr{display:flex;align-items:center;border-radius:6px;transition:background .15s}
@@ -275,19 +384,51 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .fl-link:hover{color:#fff}
 .fic{font-size:.9rem;opacity:.7;flex-shrink:0}
 .fl .fl{padding-left:1.1rem}
-/* Main */
 .main{flex:1;overflow-y:auto;padding:1.5rem 2rem}
 .main::-webkit-scrollbar{width:6px}
 .main::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
-/* Breadcrumb */
 .bc{display:flex;align-items:center;gap:.4rem;margin-bottom:1.25rem;flex-wrap:wrap}
 .bc-a{color:var(--mut);text-decoration:none;font-size:.85rem;padding:.2rem .5rem;border-radius:5px;transition:background .15s,color .15s}
 .bc-a:hover{background:var(--hov);color:var(--txt)}
 .bc-sep{color:var(--mut);font-size:.8rem}
 .bc-cur{color:var(--txt);font-size:.85rem;font-weight:600;padding:.2rem .5rem;background:var(--hov);border-radius:5px}
+/* Note banner */
+.note-bar{display:flex;align-items:flex-start;gap:.6rem;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem}
+.note-bar.hidden{display:none}
+.note-ico{color:#f59e0b;font-size:1rem;margin-top:1px;flex-shrink:0}
+.note-txt{flex:1;font-size:.85rem;color:var(--txt);outline:none;background:none;border:none;resize:none;min-height:1.2rem;font-family:inherit}
+.note-txt[contenteditable=true]{background:rgba(255,255,255,.05);border-radius:4px;padding:2px 4px}
+.note-txt:empty::before{content:attr(data-ph);color:var(--mut);pointer-events:none}
+.note-acts{display:flex;gap:.3rem;flex-shrink:0}
+.note-btn{background:none;border:1px solid var(--brd);border-radius:6px;padding:.2rem .5rem;font-size:.75rem;color:var(--mut);cursor:pointer;transition:background .15s}
+.note-btn:hover{background:var(--hov);color:var(--txt)}
+.note-btn.save{border-color:#6366f1;color:#6366f1}
+.note-btn.save:hover{background:#6366f1;color:#fff}
 /* Stats */
-.stat-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.stat-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .sbadge{display:inline-flex;align-items:center;gap:.35rem;background:var(--bbg);color:var(--btxt);font-size:.78rem;font-weight:600;padding:.3rem .7rem;border-radius:20px}
+/* Search + sort */
+.ctrl-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;min-width:180px}
+.search-ico{position:absolute;left:.65rem;top:50%;transform:translateY(-50%);color:var(--mut);font-size:.85rem;pointer-events:none}
+.search-inp{width:100%;background:var(--sur);border:1px solid var(--brd);border-radius:8px;color:var(--txt);padding:.45rem .75rem .45rem 2rem;font-size:.85rem;outline:none;transition:border-color .2s}
+.search-inp:focus{border-color:#6366f1}
+.sort-btns{display:flex;gap:.35rem;flex-shrink:0}
+.sort-btn{background:var(--bbg);border:1px solid var(--brd);border-radius:7px;padding:.3rem .6rem;font-size:.75rem;font-weight:600;color:var(--btxt);cursor:pointer;transition:background .15s,color .15s;display:flex;align-items:center;gap:.3rem;white-space:nowrap}
+.sort-btn:hover{background:var(--hov);color:var(--txt)}
+.sort-btn.active{background:#6366f1;border-color:#6366f1;color:#fff}
+/* Upload zone */
+.up-zone{display:none;margin-bottom:1.25rem}
+#mainContent.level-2 .up-zone{display:block}
+.up-drop{border:2px dashed var(--brd);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--mut)}
+.up-drop:hover,.up-drop.drag{border-color:#6366f1;background:rgba(99,102,241,.05);color:#6366f1}
+.up-drop i{font-size:1.8rem;margin-bottom:.4rem;display:block}
+.up-drop p{margin:0;font-size:.85rem}
+.up-lbl{color:#6366f1;cursor:pointer;text-decoration:underline}
+.up-status{margin-top:.5rem;font-size:.8rem}
+.up-item{display:flex;align-items:center;gap:.4rem;padding:.2rem 0;color:var(--mut)}
+.up-item.ok{color:#10b981}
+.up-item.err{color:#ef4444}
 /* Error */
 .err-box{display:flex;align-items:flex-start;gap:1rem;background:#fff1f1;border:1px solid #fcd5d5;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem}
 [data-theme=dark] .err-box{background:#2c1a1a;border-color:#5c2e2e}
@@ -298,21 +439,60 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 /* File card */
 .fcard{background:var(--sur);border:1px solid var(--brd);border-radius:12px;overflow:hidden;box-shadow:var(--sha)}
 .ftbl{width:100%;border-collapse:collapse;margin:0}
-.ftbl thead th{background:var(--bg);border-bottom:1px solid var(--brd);padding:.6rem 1rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.ftbl thead th{background:var(--bg);border-bottom:1px solid var(--brd);padding:.55rem 1rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);cursor:pointer;user-select:none;white-space:nowrap}
+.ftbl thead th:hover{color:var(--txt)}
+.ftbl thead th .sort-ind{opacity:.4;font-size:.65rem;margin-left:.2rem}
+.ftbl thead th.sorted .sort-ind{opacity:1;color:#6366f1}
 .ftbl tbody tr{border-bottom:1px solid var(--brd);transition:background .12s;cursor:pointer}
 .ftbl tbody tr:last-child{border-bottom:none}
 .ftbl tbody tr:hover{background:var(--rho)}
-.ftbl tbody td{padding:.7rem 1rem;vertical-align:middle;font-size:.875rem}
+.ftbl tbody tr.pinned{background:rgba(99,102,241,.04)}
+.ftbl tbody td{padding:.65rem 1rem;vertical-align:middle;font-size:.875rem}
 .fn{display:flex;align-items:center;gap:.55rem;font-weight:600}
+.fm{font-size:.72rem;color:var(--mut);margin-top:1px;font-family:monospace}
 .ep{color:#6366f1;font-size:1.05rem}
 .eh{color:#10b981;font-size:1.05rem}
 .fp{color:var(--mut);font-size:.8rem;font-family:monospace}
-.fac{display:flex;align-items:center;gap:.4rem;white-space:nowrap}
-.btn-o{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .7rem;border-radius:6px;font-size:.78rem;font-weight:600;background:transparent;border:1.5px solid #6366f1;color:#6366f1;text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+.pin-ico{color:#f59e0b;font-size:.75rem;margin-left:.2rem}
+.fac{display:flex;align-items:center;gap:.35rem;white-space:nowrap;flex-wrap:wrap}
+/* Buttons â€” default (user, level 0) */
+.btn-lock{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid var(--mut);color:var(--mut);cursor:default}
+.btn-o{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #6366f1;color:#6366f1;text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
 .btn-o:hover{background:#6366f1;color:#fff}
-.btn-s{display:none;align-items:center;gap:.3rem;padding:.3rem .7rem;border-radius:6px;font-size:.78rem;font-weight:600;background:transparent;border:1.5px solid #f59e0b;color:#f59e0b;cursor:pointer;transition:background .15s,color .15s}
+.btn-dl{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #0ea5e9;color:#0ea5e9;cursor:pointer;transition:background .15s,color .15s}
+.btn-dl:hover{background:#0ea5e9;color:#fff}
+.btn-tog{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #10b981;color:#10b981;cursor:pointer;transition:background .15s,color .15s}
+.btn-tog:hover{background:#10b981;color:#fff}
+.file-row.unlocked .btn-tog{border-color:#ef4444;color:#ef4444}
+.file-row.unlocked .btn-tog:hover{background:#ef4444;color:#fff}
+.btn-pin{display:none;align-items:center;gap:.3rem;padding:.3rem .5rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid var(--brd);color:var(--mut);cursor:pointer;transition:background .15s,color .15s}
+.btn-pin:hover{background:var(--hov);color:#f59e0b;border-color:#f59e0b}
+.file-row.pinned .btn-pin{color:#f59e0b;border-color:#f59e0b}
+.btn-s{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #f59e0b;color:#f59e0b;cursor:pointer;transition:background .15s,color .15s}
 .btn-s:hover{background:#f59e0b;color:#fff}
-.admin-mode .btn-s{display:inline-flex}
+/* Unlocked file: user can open */
+.file-row.unlocked .btn-lock{display:none}
+.file-row.unlocked .btn-o{display:inline-flex}
+/* Level 1 (owner) and level 2 (admin) */
+#mainContent.level-1 .btn-lock,
+#mainContent.level-2 .btn-lock{display:none}
+#mainContent.level-1 .btn-o,
+#mainContent.level-2 .btn-o{display:inline-flex}
+#mainContent.level-1 .btn-dl,
+#mainContent.level-2 .btn-dl{display:inline-flex}
+#mainContent.level-1 .btn-tog,
+#mainContent.level-2 .btn-tog{display:inline-flex}
+#mainContent.level-1 .btn-pin,
+#mainContent.level-2 .btn-pin{display:inline-flex}
+/* Level 2 (admin) only */
+#mainContent.level-2 .btn-s{display:inline-flex}
+/* Note bar: hide if no note and not logged in */
+.note-bar.no-note{display:none}
+#mainContent.level-1 .note-bar.no-note,
+#mainContent.level-2 .note-bar.no-note{display:flex}
+.note-edit-area{display:none}
+#mainContent.level-1 .note-edit-area,
+#mainContent.level-2 .note-edit-area{display:flex}
 /* Empty */
 .empty{text-align:center;padding:4rem 2rem}
 .empty-ico{font-size:4rem;color:var(--mut);opacity:.4;margin-bottom:1rem}
@@ -353,7 +533,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .cd-body pre code{border-radius:8px}
 .ver{position:fixed;bottom:.6rem;left:50%;transform:translateX(-50%);font-size:.68rem;color:var(--mut);opacity:.45;z-index:100;cursor:pointer;user-select:none;transition:opacity .2s}
 .ver:hover{opacity:.9}
-@media(max-width:768px){:root{--sw:220px}.main{padding:1rem}.fp{display:none}}
+.no-res{text-align:center;padding:2rem;color:var(--mut);font-size:.875rem;display:none}
+@media(max-width:768px){:root{--sw:220px}.main{padding:1rem}.fp{display:none}.fm{display:none}}
 </style>
 </head>
 <body>
@@ -365,11 +546,13 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
     <span style="opacity:.4;font-weight:400;font-size:.95rem">&nbsp;&middot; Explorer</span>
   </div>
   <div class="tb-right">
+    <span class="lvl-badge" id="lvlBadge"><i class="bi bi-shield-fill"></i><span id="lvlTxt"></span></span>
+    <button class="iam-btn" id="iamBtn" onclick="openLogin()">
+      <i class="bi bi-person-lock"></i> Anmelden
+    </button>
     <button class="dark-btn" id="darkBtn">
-      <i class="bi bi-sun dk-dark"></i>
-      <span class="dk-dark">Hell</span>
-      <i class="bi bi-moon-stars dk-light"></i>
-      <span class="dk-light">Dunkel</span>
+      <i class="bi bi-sun dk-dark"></i><span class="dk-dark">Hell</span>
+      <i class="bi bi-moon-stars dk-light"></i><span class="dk-light">Dunkel</span>
     </button>
   </div>
 </header>
@@ -396,23 +579,55 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
       <?php endforeach; ?>
     </nav>
 
+    <!-- Folder note -->
+    <div class="note-bar<?= $curNote === '' ? ' no-note' : '' ?>" id="noteBar">
+      <i class="bi bi-sticky note-ico"></i>
+      <div class="note-txt" id="noteTxt" data-ph="Notiz f&uuml;r diesen Ordner ..."><?= htmlspecialchars($curNote) ?></div>
+      <div class="note-acts note-edit-area">
+        <button class="note-btn" id="noteEditBtn" onclick="startNote()"><i class="bi bi-pencil"></i></button>
+        <button class="note-btn save" id="noteSaveBtn" style="display:none" onclick="saveNote()"><i class="bi bi-check2"></i> Speichern</button>
+        <button class="note-btn" id="noteCancelBtn" style="display:none" onclick="cancelNote()"><i class="bi bi-x"></i></button>
+      </div>
+    </div>
+
     <?php if ($error): ?>
     <div class="err-box">
       <div class="err-ico"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <div>
-        <div class="err-ttl">Fehler beim Laden</div>
-        <div class="err-msg"><?= $error ?></div>
-      </div>
+      <div><div class="err-ttl">Fehler beim Laden</div><div class="err-msg"><?= $error ?></div></div>
     </div>
     <?php endif; ?>
 
     <div class="stat-row">
-      <span class="sbadge"><i class="bi bi-file-earmark-code"></i>
-        <?= count($files) ?> Datei<?= count($files) !== 1 ? 'en' : '' ?>
-      </span>
+      <span class="sbadge"><i class="bi bi-file-earmark-code"></i> <?= count($files) ?> Datei<?= count($files) !== 1 ? 'en' : '' ?></span>
       <?php if ($phpCount):  ?><span class="sbadge"><i class="bi bi-filetype-php" style="color:#6366f1"></i> <?= $phpCount ?> PHP</span><?php endif; ?>
       <?php if ($htmlCount): ?><span class="sbadge"><i class="bi bi-filetype-html" style="color:#10b981"></i> <?= $htmlCount ?> HTML</span><?php endif; ?>
     </div>
+
+    <!-- Upload zone (admin only) -->
+    <div class="up-zone">
+      <div class="up-drop" id="upDrop">
+        <i class="bi bi-cloud-upload"></i>
+        <p>Dateien hierher ziehen oder <label for="upInp" class="up-lbl">ausw&auml;hlen</label></p>
+        <input type="file" id="upInp" multiple accept=".php,.html,.htm,.css,.js,.txt,.json,.md" style="display:none">
+      </div>
+      <div class="up-status" id="upStatus"></div>
+    </div>
+
+    <!-- Search + sort -->
+    <?php if (!empty($files)): ?>
+    <div class="ctrl-row">
+      <div class="search-wrap">
+        <i class="bi bi-search search-ico"></i>
+        <input type="text" id="searchInp" class="search-inp" placeholder="Dateien suchen ...">
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn active" data-sort="pin" onclick="setSort('pin')"><i class="bi bi-pin-angle"></i> Pin</button>
+        <button class="sort-btn" data-sort="name" onclick="setSort('name')"><i class="bi bi-sort-alpha-down"></i> Name</button>
+        <button class="sort-btn" data-sort="date" onclick="setSort('date')"><i class="bi bi-calendar3"></i> Datum</button>
+        <button class="sort-btn" data-sort="size" onclick="setSort('size')"><i class="bi bi-arrow-up-down"></i> Gr&ouml;&szlig;e</button>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <?php if (empty($files)): ?>
     <div class="fcard">
@@ -424,26 +639,69 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
     </div>
     <?php else: ?>
     <div class="fcard">
-      <table class="ftbl">
-        <thead><tr><th>Dateiname</th><th class="fp">Pfad</th><th>Aktionen</th></tr></thead>
-        <tbody>
+      <table class="ftbl" id="fileTable">
+        <thead>
+          <tr>
+            <th onclick="setSort('name')">Dateiname <span class="sort-ind bi bi-chevron-expand"></span></th>
+            <th class="fp">Pfad</th>
+            <th onclick="setSort('size')" style="white-space:nowrap">Gr&ouml;&szlig;e <span class="sort-ind bi bi-chevron-expand"></span></th>
+            <th onclick="setSort('date')" style="white-space:nowrap">Ge&auml;ndert <span class="sort-ind bi bi-chevron-expand"></span></th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="fileBody">
         <?php foreach ($files as $file):
-            $rel    = str_replace($root . DIRECTORY_SEPARATOR, '', $file);
-            $relUrl = str_replace(DIRECTORY_SEPARATOR, '/', $rel);
-            $base   = basename($file);
-            $isPhp  = (bool) preg_match('/\.php$/i', $base);
-            $ico    = $isPhp ? 'bi-filetype-php ep' : 'bi-filetype-html eh';
-            $dir    = dirname($rel);
-            $dsp    = ($dir === '.' ? '/' : '/' . str_replace(DIRECTORY_SEPARATOR, '/', $dir));
+            $rel      = str_replace($root . DIRECTORY_SEPARATOR, '', $file['path']);
+            $relPath  = str_replace(DIRECTORY_SEPARATOR, '/', $rel);
+            $relUrl   = $relPath;
+            $base     = basename($file['path']);
+            $isPhp    = (bool) preg_match('/\.php$/i', $base);
+            $ico      = $isPhp ? 'bi-filetype-php ep' : 'bi-filetype-html eh';
+            $dir      = dirname($rel);
+            $dsp      = ($dir === '.' ? '/' : '/' . str_replace(DIRECTORY_SEPARATOR, '/', $dir));
+            $isUL     = in_array($relPath, $unlocked);
+            $isPin    = in_array($relPath, $pinned);
+            $sz       = fmtSize($file['size']);
+            $dt       = date('d.m.Y H:i', $file['mtime']);
+            $rowCls   = ($isUL ? ' unlocked' : '') . ($isPin ? ' pinned' : '');
         ?>
-        <tr onclick="window.open('<?= htmlspecialchars($relUrl) ?>','_blank')">
-          <td><div class="fn"><i class="bi <?= $ico ?>"></i><?= htmlspecialchars($base) ?></div></td>
+        <tr class="file-row<?= $rowCls ?>"
+            data-url="<?= htmlspecialchars($relUrl) ?>"
+            data-name="<?= htmlspecialchars(strtolower($base)) ?>"
+            data-size="<?= $file['size'] ?>"
+            data-date="<?= $file['mtime'] ?>"
+            data-path="<?= htmlspecialchars($relPath) ?>">
+          <td>
+            <div class="fn">
+              <i class="bi <?= $ico ?>"></i>
+              <?= htmlspecialchars($base) ?>
+              <?php if ($isPin): ?><i class="bi bi-pin-fill pin-ico"></i><?php endif; ?>
+            </div>
+            <div class="fm"><?= $sz ?></div>
+          </td>
           <td class="fp"><?= htmlspecialchars($dsp) ?></td>
+          <td class="fp"><?= $sz ?></td>
+          <td class="fp"><?= $dt ?></td>
           <td>
             <div class="fac">
+              <span class="btn-lock"><i class="bi bi-lock"></i></span>
               <a class="btn-o" href="<?= htmlspecialchars($relUrl) ?>" target="_blank" onclick="event.stopPropagation()">
                 <i class="bi bi-box-arrow-up-right"></i> &Ouml;ffnen
               </a>
+              <button class="btn-dl" onclick="event.stopPropagation();dlFile('<?= htmlspecialchars(addslashes($relPath)) ?>')" title="Herunterladen">
+                <i class="bi bi-download"></i>
+              </button>
+              <button class="btn-tog"
+                onclick="event.stopPropagation();toggleFile(this,'<?= htmlspecialchars(addslashes($relPath)) ?>')"
+                title="<?= $isUL ? 'Sperren' : 'Freigeben' ?>">
+                <i class="bi <?= $isUL ? 'bi-lock' : 'bi-unlock' ?>"></i>
+                <span><?= $isUL ? 'Sperren' : 'Freigeben' ?></span>
+              </button>
+              <button class="btn-pin"
+                onclick="event.stopPropagation();pinFile(this,'<?= htmlspecialchars(addslashes($relPath)) ?>')"
+                title="<?= $isPin ? 'Pin entfernen' : 'Anpinnen' ?>">
+                <i class="bi <?= $isPin ? 'bi-pin-fill' : 'bi-pin' ?>"></i>
+              </button>
               <button class="btn-s"
                 onclick="event.stopPropagation();showSrc('<?= htmlspecialchars(addslashes($relUrl)) ?>','<?= htmlspecialchars(addslashes($base)) ?>')"
                 title="Code anzeigen">
@@ -455,6 +713,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
         <?php endforeach; ?>
         </tbody>
       </table>
+      <div class="no-res" id="noRes"><i class="bi bi-search"></i> Keine Ergebnisse</div>
     </div>
     <?php endif; ?>
 
@@ -462,19 +721,30 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 </div>
 
 <div class="ver">v<?= _VER ?></div>
+<div class="toast-n" id="toastEl"><i class="bi" id="toastIco"></i><span id="toastMsg"></span></div>
 
-<div class="toast-n" id="toastEl">
-  <i class="bi" id="toastIco"></i><span id="toastMsg"></span>
-</div>
-
-<!-- Passwort Modal -->
+<!-- Login Modal -->
 <div class="pw-ov" id="pwOv">
   <div class="pw-box">
     <div class="pw-ico"><i class="bi bi-shield-lock"></i></div>
-    <div class="pw-ttl">Admin-Zugang</div>
+    <div class="pw-ttl">Anmelden</div>
     <input type="password" id="pwInp" class="pw-inp" placeholder="Passwort" autocomplete="off" spellcheck="false">
     <div class="pw-err" id="pwErr"></div>
     <button class="pw-btn" id="pwBtn">Best&auml;tigen</button>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="pw-ov" id="cpwOv">
+  <div class="pw-box">
+    <div class="pw-ico"><i class="bi bi-key"></i></div>
+    <div class="pw-ttl" id="cpwTtl">Passwort &auml;ndern</div>
+    <input type="password" id="cpwCur" class="pw-inp" placeholder="Aktuelles Passwort" autocomplete="off">
+    <input type="password" id="cpwNew" class="pw-inp" placeholder="Neues Passwort (mind. 4 Zeichen)" autocomplete="new-password" style="margin-top:.4rem">
+    <input type="password" id="cpwCon" class="pw-inp" placeholder="Neues Passwort best&auml;tigen" autocomplete="new-password" style="margin-top:.4rem">
+    <div class="pw-err" id="cpwErr"></div>
+    <button class="pw-btn" id="cpwBtn">Speichern</button>
+    <button class="pw-btn" id="cpwSkip" style="margin-top:.5rem;background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--mut);font-size:.8rem" onclick="closeCpw()">Sp&auml;ter</button>
   </div>
 </div>
 
@@ -495,15 +765,20 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
-// ── Dark Mode ─────────────────────────────────────────────────────────────────
-const _html = document.documentElement;
+const _html      = document.documentElement;
+const _mc        = document.getElementById('mainContent');
+const _csrf      = '<?= $csrf ?>';
+const _curDir    = <?= json_encode($relCurDir) ?>;
+const _defPw     = <?= $isDefaultPw ? 'true' : 'false' ?>;
+
+// â”€â”€ Dark Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.getElementById('darkBtn').addEventListener('click', () => {
   const dark = _html.getAttribute('data-theme') !== 'dark';
   _html.setAttribute('data-theme', dark ? 'dark' : 'light');
-  document.cookie = 'dk=' + (dark ? 1 : 0) + ';path=/;max-age=315360000;SameSite=Lax';
+  document.cookie = 'dk=' + (dark?1:0) + ';path=/;max-age=315360000;SameSite=Lax';
 });
 
-// ── Sidebar Chevrons ──────────────────────────────────────────────────────────
+// â”€â”€ Sidebar chevrons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.querySelectorAll('.tb').forEach(btn => {
   btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
   const tgt = document.querySelector(btn.dataset.bsTarget);
@@ -512,68 +787,88 @@ document.querySelectorAll('.tb').forEach(btn => {
   tgt.addEventListener('hide.bs.collapse', () => btn.querySelector('.ti')?.classList.remove('open'));
 });
 
-// ── Brand Name bearbeiten ─────────────────────────────────────────────────────
-(function () {
+// â”€â”€ Brand name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+(function() {
   const stored = localStorage.getItem('_bn');
-  if (stored) {
-    document.getElementById('brandNm').textContent = stored;
-    document.title = stored + ' · Datei-Explorer';
-  }
+  if (stored) { document.getElementById('brandNm').textContent = stored; document.title = stored + ' Â· Explorer'; }
 })();
-
 document.querySelector('.tb-brand').addEventListener('click', e => {
-  const tgt = e.target.closest('#brandNm');
-  if (!tgt) return;
+  const tgt = e.target.closest('#brandNm'); if (!tgt) return;
   const cur = tgt.textContent;
   const inp = document.createElement('input');
-  inp.type = 'text'; inp.value = cur;
-  inp.className = 'brand-inp'; inp.maxLength = 30;
+  inp.type = 'text'; inp.value = cur; inp.className = 'brand-inp'; inp.maxLength = 30;
   tgt.replaceWith(inp); inp.focus(); inp.select();
   let done = false;
   function save() {
     if (done) return; done = true;
     const val = inp.value.trim() || 'GodLe972';
     localStorage.setItem('_bn', val);
-    document.title = val + ' · Datei-Explorer';
+    document.title = val + ' Â· Explorer';
     const sp = document.createElement('span');
-    sp.id = 'brandNm'; sp.className = 'brand-nm';
-    sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
+    sp.id = 'brandNm'; sp.className = 'brand-nm'; sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
     inp.replaceWith(sp);
   }
   inp.addEventListener('blur', save);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') inp.blur();
-    if (e.key === 'Escape') { done = true; inp.value = cur; inp.replaceWith(tgt); }
-  });
+  inp.addEventListener('keydown', e => { if (e.key==='Enter') inp.blur(); if (e.key==='Escape') { done=true; inp.replaceWith(tgt); } });
 });
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _toastTimer;
 function showToast(msg, icon, dur) {
-  document.getElementById('toastIco').className = 'bi ' + (icon || 'bi-info-circle');
+  clearTimeout(_toastTimer);
+  document.getElementById('toastIco').className = 'bi ' + (icon||'bi-info-circle');
   document.getElementById('toastMsg').textContent = msg;
   const t = document.getElementById('toastEl');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), dur || 3200);
+  if (dur !== 99999) _toastTimer = setTimeout(() => t.classList.remove('show'), dur||3200);
 }
+function hideToast() { clearTimeout(_toastTimer); document.getElementById('toastEl').classList.remove('show'); }
 
-// ── Admin Mode ────────────────────────────────────────────────────────────────
-// Passwort wird NICHT im Quelltext gespeichert -- Verifikation laeuft server-seitig
-const _csrf = '<?= $csrf ?>';
-let adminActive = false;
+// â”€â”€ Auth / Levels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let userLevel = 0;
 let _token = sessionStorage.getItem('_st') || '';
 
 if (_token) {
-  adminActive = true;
-  document.getElementById('mainContent')?.classList.add('admin-mode');
+  userLevel = parseInt(sessionStorage.getItem('_sl') || '0', 10);
+  applyLevel(userLevel, false);
+}
+
+function openLogin() {
+  document.getElementById('pwOv').classList.add('open');
+  setTimeout(() => document.getElementById('pwInp').focus(), 50);
+}
+
+function applyLevel(lvl, announce) {
+  userLevel = lvl;
+  _mc.classList.remove('level-1', 'level-2');
+  if (lvl >= 1) _mc.classList.add('level-1');
+  if (lvl >= 2) _mc.classList.add('level-2');
+  const badge  = document.getElementById('lvlBadge');
+  const txt    = document.getElementById('lvlTxt');
+  const iamBtn = document.getElementById('iamBtn');
+  if (lvl >= 1) {
+    badge.classList.add('show');
+    iamBtn.classList.add('hidden');
+    txt.textContent = lvl >= 2 ? 'Admin' : 'Owner';
+    badge.style.background  = lvl >= 2 ? 'rgba(99,102,241,.25)' : 'rgba(16,185,129,.2)';
+    badge.style.borderColor = lvl >= 2 ? 'rgba(99,102,241,.4)'  : 'rgba(16,185,129,.4)';
+    badge.style.color       = lvl >= 2 ? '#a5b4fc' : '#6ee7b7';
+    if (announce) {
+      showToast(lvl >= 2 ? 'Admin-Modus aktiv' : 'Willkommen, Owner',
+        lvl >= 2 ? 'bi-shield-lock-fill' : 'bi-shield-check');
+      if (lvl === 1 && _defPw) setTimeout(openCpw, 800);
+    }
+  } else {
+    badge.classList.remove('show');
+    iamBtn.classList.remove('hidden');
+  }
 }
 
 Object.defineProperty(window, 'admin', {
   get() {
-    if (adminActive) { showToast('Admin-Modus bereits aktiv', 'bi-shield-check'); return; }
-    document.getElementById('pwOv').classList.add('open');
-    setTimeout(() => document.getElementById('pwInp').focus(), 50);
-  },
-  configurable: true
+    if (userLevel >= 2) { showToast('Admin bereits aktiv', 'bi-shield-check'); return; }
+    openLogin();
+  }, configurable: true
 });
 
 document.getElementById('pwBtn').onclick = checkPw;
@@ -590,25 +885,21 @@ async function checkPw() {
   fd.append('p', inp.value);
   fd.append('c', _csrf);
   try {
-    const res  = await fetch('?_a=1', {method: 'POST', body: fd});
+    const res  = await fetch('?_a=1', {method:'POST', body:fd});
     const data = await res.json();
     if (data.ok) {
       _token = data.t;
       sessionStorage.setItem('_st', _token);
+      sessionStorage.setItem('_sl', data.lvl);
       closePw();
-      adminActive = true;
-      document.getElementById('mainContent').classList.add('admin-mode');
-      showToast('Admin-Modus aktiv', 'bi-shield-lock-fill');
+      applyLevel(data.lvl, true);
     } else {
       err.textContent = 'Falsches Passwort';
-      inp.value = '';
-      inp.classList.add('shake');
+      inp.value = ''; inp.classList.add('shake');
       setTimeout(() => inp.classList.remove('shake'), 400);
       inp.focus();
     }
-  } catch (ex) {
-    err.textContent = 'Verbindungsfehler';
-  }
+  } catch { err.textContent = 'Verbindungsfehler'; }
 }
 
 function closePw() {
@@ -618,11 +909,173 @@ function closePw() {
   document.getElementById('pwInp').classList.remove('shake');
 }
 
-// ── Source Viewer ─────────────────────────────────────────────────────────────
+// â”€â”€ Row click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+document.addEventListener('click', e => {
+  const row = e.target.closest('tr.file-row');
+  if (!row || e.target.closest('a,button')) return;
+  const canOpen = userLevel >= 1 || row.classList.contains('unlocked');
+  if (!canOpen) { showToast('Gesperrt â€” kein Zugriff', 'bi-lock', 2500); return; }
+  window.open(row.dataset.url, '_blank');
+});
+
+// â”€â”€ Toggle unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function toggleFile(btn, relPath) {
+  const row = btn.closest('tr');
+  const fd = new FormData(); fd.append('_t', _token); fd.append('f', relPath);
+  try {
+    const res  = await fetch('?_tog=1', {method:'POST', body:fd});
+    const data = await res.json();
+    if (!data.ok) { showToast('Fehler', 'bi-x', 2000); return; }
+    const i = btn.querySelector('i');
+    const s = btn.querySelector('span');
+    if (data.unlocked) {
+      row.classList.add('unlocked');
+      i.className = 'bi bi-lock'; s.textContent = 'Sperren'; btn.title = 'Sperren';
+      showToast('Freigegeben fÃ¼r Besucher', 'bi-unlock', 2500);
+    } else {
+      row.classList.remove('unlocked');
+      i.className = 'bi bi-unlock'; s.textContent = 'Freigeben'; btn.title = 'Freigeben';
+      showToast('Gesperrt', 'bi-lock', 2500);
+    }
+  } catch { showToast('Verbindungsfehler', 'bi-wifi-off', 2500); }
+}
+
+// â”€â”€ Pin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function pinFile(btn, relPath) {
+  const row = btn.closest('tr');
+  const fd = new FormData(); fd.append('_t', _token); fd.append('f', relPath);
+  try {
+    const res  = await fetch('?_pin=1', {method:'POST', body:fd});
+    const data = await res.json();
+    if (!data.ok) return;
+    const i = btn.querySelector('i');
+    if (data.pinned) {
+      row.classList.add('pinned'); i.className = 'bi bi-pin-fill'; btn.title = 'Pin entfernen';
+      showToast('Angepinnt', 'bi-pin-fill', 2000);
+    } else {
+      row.classList.remove('pinned'); i.className = 'bi bi-pin'; btn.title = 'Anpinnen';
+      showToast('Pin entfernt', 'bi-pin', 2000);
+    }
+  } catch {}
+}
+
+// â”€â”€ Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function dlFile(relPath) {
+  window.location.href = '?dl=1&f=' + encodeURIComponent(relPath) + '&_t=' + encodeURIComponent(_token);
+}
+
+// â”€â”€ Note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _noteOrig = '';
+function startNote() {
+  const el = document.getElementById('noteTxt');
+  _noteOrig = el.textContent;
+  el.contentEditable = 'true'; el.focus();
+  document.getElementById('noteEditBtn').style.display  = 'none';
+  document.getElementById('noteSaveBtn').style.display  = '';
+  document.getElementById('noteCancelBtn').style.display = '';
+}
+function cancelNote() {
+  const el = document.getElementById('noteTxt');
+  el.textContent = _noteOrig; el.contentEditable = 'false';
+  document.getElementById('noteEditBtn').style.display  = '';
+  document.getElementById('noteSaveBtn').style.display  = 'none';
+  document.getElementById('noteCancelBtn').style.display = 'none';
+}
+async function saveNote() {
+  const el = document.getElementById('noteTxt');
+  const text = el.textContent.trim();
+  const fd = new FormData();
+  fd.append('_t', _token); fd.append('d', _curDir); fd.append('t', text);
+  el.contentEditable = 'false';
+  document.getElementById('noteEditBtn').style.display  = '';
+  document.getElementById('noteSaveBtn').style.display  = 'none';
+  document.getElementById('noteCancelBtn').style.display = 'none';
+  try {
+    await fetch('?_note=1', {method:'POST', body:fd});
+    const bar = document.getElementById('noteBar');
+    if (text === '') bar.classList.add('no-note'); else bar.classList.remove('no-note');
+    showToast('Notiz gespeichert', 'bi-check2', 2000);
+  } catch { showToast('Fehler beim Speichern', 'bi-x', 2500); }
+}
+
+// â”€â”€ Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const upDrop = document.getElementById('upDrop');
+const upInp  = document.getElementById('upInp');
+if (upDrop) {
+  upDrop.addEventListener('click', () => upInp.click());
+  upDrop.addEventListener('dragover', e => { e.preventDefault(); upDrop.classList.add('drag'); });
+  upDrop.addEventListener('dragleave', () => upDrop.classList.remove('drag'));
+  upDrop.addEventListener('drop', e => { e.preventDefault(); upDrop.classList.remove('drag'); uploadFiles(e.dataTransfer.files); });
+  upInp.addEventListener('change', () => uploadFiles(upInp.files));
+}
+async function uploadFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const fd = new FormData();
+  fd.append('_t', _token);
+  fd.append('d', '');
+  for (const f of fileList) fd.append('f[]', f);
+  showToast('Wird hochgeladen ...', 'bi-cloud-upload', 99999);
+  try {
+    const res  = await fetch('?_up=1', {method:'POST', body:fd});
+    const data = await res.json();
+    hideToast();
+    if (!data.ok && data.s === 'auth') { showToast('Keine Berechtigung', 'bi-lock', 3000); return; }
+    const st = document.getElementById('upStatus');
+    st.innerHTML = (data.files||[]).map(f =>
+      `<div class="up-item ${f.ok?'ok':'err'}"><i class="bi ${f.ok?'bi-check2':'bi-x'}"></i>${f.n}${f.s==='type'?' (Dateityp nicht erlaubt)':''}</div>`
+    ).join('');
+    const ok = (data.files||[]).filter(f=>f.ok).length;
+    showToast(ok + ' Datei(en) hochgeladen', 'bi-check-circle', 3000);
+    if (ok > 0) setTimeout(() => location.reload(), 2500);
+  } catch { hideToast(); showToast('Upload-Fehler', 'bi-wifi-off', 3000); }
+}
+
+// â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+document.getElementById('searchInp')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  let visible = 0;
+  document.querySelectorAll('#fileBody tr.file-row').forEach(row => {
+    const name = row.dataset.name || '';
+    const path = row.dataset.path || '';
+    const match = !q || name.includes(q) || path.toLowerCase().includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const nr = document.getElementById('noRes');
+  if (nr) nr.style.display = visible === 0 && q ? 'block' : 'none';
+});
+
+// â”€â”€ Sort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _sortKey = 'pin', _sortDir = 1;
+function setSort(key) {
+  if (_sortKey === key) _sortDir *= -1; else { _sortKey = key; _sortDir = 1; }
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === key));
+  document.querySelectorAll('.ftbl thead th').forEach(th => {
+    const ind = th.querySelector('.sort-ind');
+    if (!ind) return;
+    const sorted = th.onclick?.toString().includes("'"+key+"'");
+    th.classList.toggle('sorted', sorted);
+    if (ind) ind.className = 'sort-ind bi ' + (sorted ? (_sortDir===1?'bi-chevron-up':'bi-chevron-down') : 'bi-chevron-expand');
+  });
+  const body = document.getElementById('fileBody');
+  if (!body) return;
+  const rows = [...body.querySelectorAll('tr.file-row')];
+  rows.sort((a, b) => {
+    let va, vb;
+    if (key === 'pin')  { va = a.classList.contains('pinned')?0:1; vb = b.classList.contains('pinned')?0:1; }
+    if (key === 'name') { va = a.dataset.name; vb = b.dataset.name; }
+    if (key === 'size') { va = parseInt(a.dataset.size||0); vb = parseInt(b.dataset.size||0); }
+    if (key === 'date') { va = parseInt(a.dataset.date||0); vb = parseInt(b.dataset.date||0); }
+    if (va < vb) return -_sortDir; if (va > vb) return _sortDir; return 0;
+  });
+  rows.forEach(r => body.appendChild(r));
+}
+
+// â”€â”€ Source Viewer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function showSrc(relPath, filename) {
   document.getElementById('cdFile').textContent = filename;
   const el = document.getElementById('cdEl');
-  el.textContent = 'Wird geladen ...';
+  el.textContent = 'Wird geladen ...'; el.className = '';
   document.getElementById('cdOv').classList.add('open');
   try {
     const res = await fetch('?source=' + encodeURIComponent(relPath) + '&_t=' + encodeURIComponent(_token));
@@ -630,10 +1083,7 @@ async function showSrc(relPath, filename) {
     el.textContent = await res.text();
     el.className   = filename.endsWith('.php') ? 'language-php' : 'language-html';
     hljs.highlightElement(el);
-  } catch (ex) {
-    el.textContent = 'Fehler: ' + ex.message;
-    el.className = '';
-  }
+  } catch(ex) { el.textContent = 'Fehler: ' + ex.message; }
 }
 function closeCode() { document.getElementById('cdOv').classList.remove('open'); }
 async function copyCode() {
@@ -648,32 +1098,68 @@ async function copyCode() {
   }
   setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCode(); closePw(); } });
 
-// ── Versionsanzeige: Klick = manuelles Update ─────────────────────────────────
+// â”€â”€ Version click = manual update (admin only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.querySelector('.ver').addEventListener('click', async () => {
-  if (!adminActive) {
-    showToast('Admin-Modus noetig (Konsole: admin)', 'bi-lock', 2500);
-    return;
-  }
+  if (userLevel < 2) { showToast('Admin-Modus benÃ¶tigt (Konsole: admin)', 'bi-lock', 2500); return; }
   showToast('Suche Update ...', 'bi-cloud-download', 99999);
-  const fd = new FormData();
-  fd.append('_t', _token);
+  const fd = new FormData(); fd.append('_t', _token);
   try {
-    const res  = await fetch('?_upd=1', {method: 'POST', body: fd});
+    const res  = await fetch('?_upd=1', {method:'POST', body:fd});
     const data = await res.json();
+    hideToast();
     const msgs = {
       ok:   ['Update installiert! Wird neu geladen ...', 'bi-check-circle-fill', 4000],
       err:  ['GitHub nicht erreichbar.', 'bi-exclamation-triangle', 3000],
-      auth: ['Session abgelaufen. Bitte neu einloggen.', 'bi-lock', 3000],
+      auth: ['Session abgelaufen.', 'bi-lock', 3000],
     };
     const [msg, ico, dur] = msgs[data.s] || ['Unbekannter Fehler', 'bi-x', 3000];
     showToast(msg, ico, dur);
     if (data.s === 'ok') setTimeout(() => location.reload(), 2000);
-  } catch {
-    showToast('Verbindungsfehler', 'bi-wifi-off', 3000);
-  }
+  } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
 });
+
+// â”€â”€ Change Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function openCpw(forced) {
+  const ttl = document.getElementById('cpwTtl');
+  ttl.textContent = forced === false ? 'Passwort Ã¤ndern'
+    : 'Standard-Passwort Ã¤ndern â€” bitte jetzt setzen';
+  document.getElementById('cpwSkip').style.display = forced === false ? '' : 'none';
+  document.getElementById('cpwOv').classList.add('open');
+  setTimeout(() => document.getElementById('cpwCur').focus(), 50);
+}
+function closeCpw() {
+  document.getElementById('cpwOv').classList.remove('open');
+  ['cpwCur','cpwNew','cpwCon'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cpwErr').textContent = '';
+}
+document.getElementById('cpwBtn').addEventListener('click', async () => {
+  const cur = document.getElementById('cpwCur').value;
+  const nw  = document.getElementById('cpwNew').value;
+  const con = document.getElementById('cpwCon').value;
+  const err = document.getElementById('cpwErr');
+  err.textContent = '';
+  if (nw.length < 4) { err.textContent = 'Mind. 4 Zeichen'; return; }
+  if (nw !== con)    { err.textContent = 'PasswÃ¶rter stimmen nicht Ã¼berein'; return; }
+  const fd = new FormData();
+  fd.append('_t', _token); fd.append('cur', cur); fd.append('new', nw);
+  try {
+    const res  = await fetch('?_cpw=1', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.ok) {
+      closeCpw();
+      showToast('Passwort geÃ¤ndert', 'bi-check2-circle', 3000);
+    } else {
+      err.textContent = data.s === 'wrong' ? 'Aktuelles Passwort falsch'
+        : data.s === 'short' ? 'Zu kurz' : 'Fehler';
+    }
+  } catch { err.textContent = 'Verbindungsfehler'; }
+});
+['cpwCur','cpwNew','cpwCon'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('cpwBtn').click(); })
+);
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCode(); closePw(); closeCpw(); } });
 </script>
 </body>
 </html>
