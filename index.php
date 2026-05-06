@@ -3,7 +3,7 @@
 define('_VER', '1.1.0');
 define('_SRC', 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php?token=GHSAT0AAAAAAD3H43ZRXP2UX5FXY2V3F7SY2P3G56Q');
 define('_INT', 1800);
-define('_AK',  'MTMzNzMwMDA='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
+define('_AK',  'dGVzdDEyMw=='); // base64 -- php -r "echo base64_encode('DeinPasswort');"
 
 // Auto-Updater: zieht neue Version von GitHub (laeuft unsichtbar im Hintergrund)
 (function () {
@@ -39,6 +39,25 @@ if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['ok' => false]);
     }
     exit;
+}
+
+// ── Manuelles Update (Klick auf Versionsanzeige) ─────────────────────────────
+if (isset($_GET['_upd']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    $tok = $_POST['_t'] ?? '';
+    if (empty($_SESSION['_at']) || !hash_equals($_SESSION['_at'], $tok)) {
+        http_response_code(403); echo json_encode(['s' => 'auth']); exit;
+    }
+    $new = @file_get_contents(_SRC, false, stream_context_create(['http' => ['timeout' => 8]]));
+    if (!$new || strlen($new) < 500) {
+        echo json_encode(['s' => 'err']); exit;
+    }
+    if (md5($new) === md5_file(__FILE__)) {
+        echo json_encode(['s' => 'same']); exit;
+    }
+    @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . '.u', time()); // reset timer
+    @file_put_contents(__FILE__, $new);
+    echo json_encode(['s' => 'ok']); exit;
 }
 
 // ── Source-Endpoint: nur mit gueltigem Session-Token ─────────────────────────
@@ -291,7 +310,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .cd-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
 .cd-body pre{margin:0}
 .cd-body pre code{border-radius:8px}
-.ver{position:fixed;bottom:.6rem;left:50%;transform:translateX(-50%);font-size:.68rem;color:var(--mut);opacity:.45;pointer-events:none;z-index:100}
+.ver{position:fixed;bottom:.6rem;left:50%;transform:translateX(-50%);font-size:.68rem;color:var(--mut);opacity:.45;z-index:100;cursor:pointer;user-select:none;transition:opacity .2s}
+.ver:hover{opacity:.9}
 @media(max-width:768px){:root{--sw:220px}.main{padding:1rem}.fp{display:none}}
 </style>
 </head>
@@ -588,6 +608,32 @@ async function copyCode() {
   setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCode(); closePw(); } });
+
+// ── Versionsanzeige: Klick = manuelles Update ─────────────────────────────────
+document.querySelector('.ver').addEventListener('click', async () => {
+  if (!adminActive) {
+    showToast('Admin-Modus noetig (Konsole: admin)', 'bi-lock', 2500);
+    return;
+  }
+  showToast('Suche Update ...', 'bi-cloud-download', 99999);
+  const fd = new FormData();
+  fd.append('_t', _token);
+  try {
+    const res  = await fetch('?_upd=1', {method: 'POST', body: fd});
+    const data = await res.json();
+    const msgs = {
+      ok:   ['Update installiert! Seite neu laden.', 'bi-check-circle-fill', 4000],
+      same: ['Bereits aktuell.', 'bi-check2', 2500],
+      err:  ['GitHub nicht erreichbar.', 'bi-exclamation-triangle', 3000],
+      auth: ['Session abgelaufen. Bitte neu einloggen.', 'bi-lock', 3000],
+    };
+    const [msg, ico, dur] = msgs[data.s] || ['Unbekannter Fehler', 'bi-x', 3000];
+    showToast(msg, ico, dur);
+    if (data.s === 'ok') setTimeout(() => location.reload(), 2000);
+  } catch {
+    showToast('Verbindungsfehler', 'bi-wifi-off', 3000);
+  }
+});
 </script>
 </body>
 </html>
