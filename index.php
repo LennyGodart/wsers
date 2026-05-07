@@ -1,9 +1,9 @@
 <?php
-/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.1','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_OK'=>'MTMzNzMwMDA=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
+/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.2','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMw==','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
 
 function _inject(string $new): string {
     $cur = @file_get_contents(__FILE__) ?: '';
-    foreach (['_SRC', '_AK', '_OK'] as $k) {
+    foreach (['_SRC', '_AK'] as $k) {
         if (preg_match("/'$k'=>'([^']*)'/", $cur, $m)) {
             $v = addslashes($m[1]);
             $new = preg_replace("/'$k'=>'[^']*'/", "'$k'=>'$v'", $new);
@@ -66,6 +66,11 @@ $csrf = hash_hmac('sha256', session_id(), _AK);
 $root = realpath(__DIR__);
 
 function _lvl(): int { return (int)($_SESSION['_lvl'] ?? 0); }
+function _ok(): string {
+    static $v = null;
+    if ($v === null) { $ws = _ws(); $v = $ws['_ok'] ?? base64_encode('owner123'); }
+    return $v;
+}
 function _auth(int $min = 1): bool {
     $t = $_POST['_t'] ?? $_GET['_t'] ?? '';
     return !empty($_SESSION['_at']) && $t !== '' && hash_equals($_SESSION['_at'], $t) && _lvl() >= $min;
@@ -90,7 +95,7 @@ if (isset($_GET['_a']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $lvl = 0;
     if ($csrfOk && $pw !== '') {
         if (hash_equals(hash('sha256', base64_decode(_AK)), hash('sha256', $pw))) $lvl = 2;
-        elseif (defined('_OK') && _OK !== '' && hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $pw))) $lvl = 1;
+        elseif (hash_equals(hash('sha256', base64_decode(_ok())), hash('sha256', $pw))) $lvl = 1;
     }
     if ($lvl > 0) {
         $token = bin2hex(random_bytes(24));
@@ -195,17 +200,13 @@ if (isset($_GET['_cpw']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!_auth(1)) { http_response_code(403); echo json_encode(['ok'=>false,'s'=>'auth']); exit; }
     $cur = $_POST['cur'] ?? '';
     $new = $_POST['new'] ?? '';
-    if (!hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $cur))) {
+    if (!hash_equals(hash('sha256', base64_decode(_ok())), hash('sha256', $cur))) {
         echo json_encode(['ok'=>false,'s'=>'wrong']); exit;
     }
     if (strlen($new) < 4) { echo json_encode(['ok'=>false,'s'=>'short']); exit; }
-    $b64     = base64_encode($new);
-    $pat     = "/'_OK'=>'MTMzNzMwMDA=']" . "*'/";
-    $rep     = "'_OK'=>'MTMzNzMwMDA='";
-    $content = preg_replace($pat, $rep, file_get_contents(__FILE__));
-    if ($content === null || @file_put_contents(__FILE__, $content) === false) {
-        echo json_encode(['ok'=>false,'s'=>'write']); exit;
-    }
+    $ws = _ws();
+    $ws['_ok'] = base64_encode($new);
+    if (!_wsSave($ws)) { http_response_code(500); echo json_encode(['ok'=>false,'s'=>'write']); exit; }
     echo json_encode(['ok'=>true]); exit;
 }
 
@@ -217,7 +218,7 @@ if (isset($_GET['_del']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($paths) || empty($paths)) { echo json_encode(['ok'=>false,'s'=>'empty']); exit; }
     if (count($paths) > 1) {
         $pw = $_POST['pw'] ?? '';
-        $ok1 = hash_equals(hash('sha256', base64_decode(_OK)), hash('sha256', $pw));
+        $ok1 = hash_equals(hash('sha256', base64_decode(_ok())), hash('sha256', $pw));
         $ok2 = hash_equals(hash('sha256', base64_decode(_AK)), hash('sha256', $pw));
         if (!$ok1 && !$ok2) { echo json_encode(['ok'=>false,'s'=>'pw']); exit; }
     }
@@ -270,7 +271,7 @@ if (isset($_GET['dir'])) {
 } else { $current = $root; }
 
 $darkMode     = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
-$isDefaultPw  = defined('_OK') && hash('sha256', base64_decode(_OK)) === hash('sha256', 'owner123');
+$isDefaultPw  = hash('sha256', base64_decode(_ok())) === hash('sha256', 'owner123');
 $wsState   = _ws();
 $unlocked  = $wsState['unlocked'] ?? [];
 $pinned    = $wsState['pinned']   ?? [];
@@ -540,7 +541,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .fp{color:var(--mut);font-size:.8rem;font-family:monospace}
 .pin-ico{color:#f59e0b;font-size:.75rem;margin-left:.2rem}
 .fac{display:flex;align-items:center;gap:.35rem;white-space:nowrap;flex-wrap:wrap}
-/* Buttons Ã¢â‚¬â€ default (user, level 0) */
+/* Buttons — default (user, level 0) */
 .btn-lock{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid var(--mut);color:var(--mut);cursor:default}
 .btn-o{display:none;align-items:center;gap:.3rem;padding:.3rem .65rem;border-radius:6px;font-size:.75rem;font-weight:600;background:transparent;border:1.5px solid #6366f1;color:#6366f1;text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
 .btn-o:hover{background:#6366f1;color:#fff}
@@ -1028,7 +1029,7 @@ document.addEventListener('click', e => {
   const row = e.target.closest('tr.file-row');
   if (!row || e.target.closest('a,button')) return;
   const canOpen = userLevel >= 1 || row.classList.contains('unlocked');
-  if (!canOpen) { showToast('Gesperrt Ã¢â‚¬â€ kein Zugriff', 'bi-lock', 2500); return; }
+  if (!canOpen) { showToast('Gesperrt — kein Zugriff', 'bi-lock', 2500); return; }
   window.open(row.dataset.url, '_blank');
 });
 
@@ -1313,8 +1314,8 @@ document.querySelector('.ver').addEventListener('click', async () => {
 // Ã¢â€â‚¬Ã¢â€â‚¬ Change Password Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function openCpw(forced) {
   const ttl = document.getElementById('cpwTtl');
-  ttl.textContent = forced === false ? 'Passwort ÃƒÂ¤ndern'
-    : 'Standard-Passwort ÃƒÂ¤ndern Ã¢â‚¬â€ bitte jetzt setzen';
+  ttl.textContent = forced === false ? 'Passwort ändern'
+    : 'Standard-Passwort ändern — bitte jetzt setzen';
   document.getElementById('cpwSkip').style.display = forced === false ? '' : 'none';
   document.getElementById('cpwOv').classList.add('open');
   setTimeout(() => document.getElementById('cpwCur').focus(), 50);
@@ -1339,7 +1340,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
     const data = await res.json();
     if (data.ok) {
       closeCpw();
-      showToast('Passwort geÃƒÂ¤ndert', 'bi-check2-circle', 3000);
+      showToast('Passwort geändert', 'bi-check2-circle', 3000);
     } else {
       err.textContent = data.s === 'wrong' ? 'Aktuelles Passwort falsch'
         : data.s === 'short' ? 'Zu kurz' : 'Fehler';
