@@ -5,16 +5,21 @@
  * Full source code available at:
  * https://github.com/LennyGodart/wsers
  *
- * The entire codebase is openly auditable – no hidden behaviour,
- * no backdoors, no telemetry of any kind.
+ * The entire codebase is openly auditable
  *
  * Features:
- *   - Password-protected file browser (Owner + Admin levels)
- *   - Lock / unlock files for public access
- *   - Upload, download and delete files
+ *   - Password-protected file browser (two levels: Owner + Admin)
+ *   - All non-hidden file types displayed with type-specific icons
+ *   - Subfolder navigation inside the main file table
+ *   - Lock / unlock files for public guest access
+ *   - Upload, download and delete files (bulk delete with confirmation)
+ *   - ZIP download with interactive subfolder-exclusion tree
  *   - Pin files to the top of the list
  *   - Per-folder notes
- *   - One-click self-update (Owner or Admin, user-triggered)
+ *   - Source code viewer with syntax highlighting (Owner+)
+ *   - Disk space display (Owner+)
+ *   - Password strength indicator when changing password
+ *   - One-click self-update with background availability check
  *
  * Settings are stored in .wsconfig (JSON) next to this file.
  *
@@ -25,7 +30,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.5.0',
+        '_VER'        => '3.7.0',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -1830,12 +1835,16 @@ document.querySelector('.ver').addEventListener('click', triggerUpdate);
 
 // ── Background update check (Owner or Admin) ──────────────────────────────────
 // Runs 2 seconds after page load; result is cached 30 min server-side.
+// The banner is only shown once per session per version (sessionStorage key).
 if (userLevel >= 1) {
   setTimeout(async () => {
     try {
       const res  = await fetch('?_checkupdate=1&_t=' + encodeURIComponent(_token));
       const data = await res.json();
       if (data.ok && data.available) {
+        const seenKey = 'ws_upd_' + data.latest;
+        if (sessionStorage.getItem(seenKey)) return; // already shown this session
+        sessionStorage.setItem(seenKey, '1');
         document.getElementById('updBannerTxt').textContent =
           'Update verfügbar: v' + data.latest;
         document.getElementById('updBanner').classList.add('show');
