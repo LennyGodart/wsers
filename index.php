@@ -30,7 +30,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.7.0',
+        '_VER'        => '3.6.1',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -214,8 +214,8 @@ if (isset($_GET['_checkupdate'])) {
     $cfg       = _loadConfig();
     $lastCheck = $cfg['_uc_ts'] ?? 0;
 
-    // Return cached result if fresh enough
-    if (time() - $lastCheck < 1800) {
+    // Return cached result if fresh enough (bypass with ?force=1)
+    if (!isset($_GET['force']) && time() - $lastCheck < 1800) {
         echo json_encode(['ok' => true, 'available' => (bool)($cfg['_uc_av'] ?? false), 'latest' => $cfg['_uc_v'] ?? _VER]);
         exit;
     }
@@ -1809,12 +1809,34 @@ async function copyCode() {
   setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
 }
 
-// ── Manual update (Owner or Admin) ───────────────────────────────────────────
-// Click the version badge OR the update banner button to trigger an update.
+// ── Update check + install ────────────────────────────────────────────────────
+
+// checkForUpdate(force): fetches ?_checkupdate, shows banner if update found.
+// force=true bypasses the 30-min server cache (used on manual badge click).
+async function checkForUpdate(force = false) {
+  if (userLevel < 1) return;
+  if (force) showToast('Suche Update …', 'bi-cloud-download', 99999);
+  try {
+    const url  = '?_checkupdate=1&_t=' + encodeURIComponent(_token) + (force ? '&force=1' : '');
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (force) hideToast();
+    if (data.ok && data.available) {
+      const seenKey = 'ws_upd_' + data.latest;
+      sessionStorage.setItem(seenKey, '1');
+      document.getElementById('updBannerTxt').textContent = 'Update verfügbar: v' + data.latest;
+      document.getElementById('updBanner').classList.add('show');
+    } else if (force) {
+      showToast('Kein Update verfügbar', 'bi-check-circle', 2500);
+    }
+  } catch { if (force) { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); } }
+}
+
+// triggerUpdate(): actually downloads and installs the update (called from banner).
 async function triggerUpdate() {
-  if (userLevel < 1) { showToast('Anmelden um zu aktualisieren', 'bi-lock', 2500); return; }
+  if (userLevel < 1) return;
   document.getElementById('updBanner')?.classList.remove('show');
-  showToast('Suche Update ...', 'bi-cloud-download', 99999);
+  showToast('Installiere Update …', 'bi-cloud-download', 99999);
   const fd = new FormData();
   fd.append('_t', _token);
   try {
@@ -1822,34 +1844,31 @@ async function triggerUpdate() {
     const data = await res.json();
     hideToast();
     const msgs = {
-      ok:   ['Update installiert! Wird neu geladen ...', 'bi-check-circle-fill', 4000],
-      err:  ['GitHub nicht erreichbar.',                 'bi-exclamation-triangle', 3000],
-      auth: ['Session abgelaufen.',                      'bi-lock', 3000],
+      ok:   ['Update installiert! Wird neu geladen …', 'bi-check-circle-fill', 4000],
+      err:  ['GitHub nicht erreichbar.',                    'bi-exclamation-triangle', 3000],
+      auth: ['Session abgelaufen.',                         'bi-lock', 3000],
     };
     const [msg, ico, dur] = msgs[data.s] || ['Unbekannter Fehler', 'bi-x', 3000];
     showToast(msg, ico, dur);
     if (data.s === 'ok') setTimeout(() => location.reload(), 2000);
   } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
 }
-document.querySelector('.ver').addEventListener('click', triggerUpdate);
 
-// ── Background update check (Owner or Admin) ──────────────────────────────────
-// Runs 2 seconds after page load; result is cached 30 min server-side.
-// The banner is only shown once per session per version (sessionStorage key).
+// Version badge: force-check on click (bypasses cache).
+document.querySelector('.ver').addEventListener('click', () => checkForUpdate(true));
+
+// Background check on page load: cached, once per session per version.
 if (userLevel >= 1) {
-  setTimeout(async () => {
-    try {
-      const res  = await fetch('?_checkupdate=1&_t=' + encodeURIComponent(_token));
-      const data = await res.json();
-      if (data.ok && data.available) {
-        const seenKey = 'ws_upd_' + data.latest;
-        if (sessionStorage.getItem(seenKey)) return; // already shown this session
-        sessionStorage.setItem(seenKey, '1');
-        document.getElementById('updBannerTxt').textContent =
-          'Update verfügbar: v' + data.latest;
-        document.getElementById('updBanner').classList.add('show');
-      }
-    } catch {}
+  setTimeout(() => {
+    const url  = '?_checkupdate=1&_t=' + encodeURIComponent(_token);
+    fetch(url).then(r => r.json()).then(data => {
+      if (!data.ok || !data.available) return;
+      const seenKey = 'ws_upd_' + data.latest;
+      if (sessionStorage.getItem(seenKey)) return;
+      sessionStorage.setItem(seenKey, '1');
+      document.getElementById('updBannerTxt').textContent = 'Update verfügbar: v' + data.latest;
+      document.getElementById('updBanner').classList.add('show');
+    }).catch(() => {});
   }, 2000);
 }
 
