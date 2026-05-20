@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * WSers Explorer – Single-file PHP file manager for school web servers.
  *
@@ -25,7 +25,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.0.0',
+        '_VER'        => '3.5.0',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -231,6 +231,84 @@ if (isset($_GET['_checkupdate'])) {
     _saveConfig($cfg);
 
     echo json_encode(['ok' => true, 'available' => $available, 'latest' => $latestVer]);
+    exit;
+}
+
+// ── Folder tree (for ZIP selection modal) ───────────────────────────────────
+if (isset($_GET['_tree'])) {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_checkAuth(1)) { http_response_code(403); echo json_encode(['ok' => false]); exit; }
+
+    $rel = ltrim(str_replace(['..', '\\'], ['', '/'], $_GET['p'] ?? ''), '/');
+    $abs = $rel === '' ? $root : realpath($root . DIRECTORY_SEPARATOR . $rel);
+    if (!$abs || !str_starts_with($abs, $root) || !is_dir($abs)) {
+        http_response_code(400); echo json_encode(['ok' => false]); exit;
+    }
+
+    function _buildTree(string $dir, string $root): array {
+        $items = [];
+        foreach (@scandir($dir) ?: [] as $item) {
+            if ($item === '.' || $item === '..') continue;
+            if ($item[0] === '.') continue;
+            $full = $dir . DIRECTORY_SEPARATOR . $item;
+            $rel  = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $full));
+            $items[] = is_dir($full)
+                ? ['n' => $item, 'p' => $rel, 'd' => true,  'c' => _buildTree($full, $root)]
+                : ['n' => $item, 'p' => $rel, 'd' => false];
+        }
+        return $items;
+    }
+
+    echo json_encode(['ok' => true, 'tree' => _buildTree($abs, $root)]);
+    exit;
+}
+
+// ── ZIP download ─────────────────────────────────────────────────────────────
+if (isset($_GET['_zip']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!_checkAuth(1)) { http_response_code(403); exit; }
+
+    $include = json_decode($_POST['inc'] ?? '[]', true) ?: [];
+    $exclude = json_decode($_POST['exc'] ?? '[]', true) ?: [];
+
+    if (!class_exists('ZipArchive') || empty($include)) {
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 's' => class_exists('ZipArchive') ? 'empty' : 'nozip']);
+        exit;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'wsdl_');
+    $zip = new ZipArchive();
+    $zip->open($tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+    $addToZip = null;
+    $addToZip = function(string $abs, string $zipPath) use (&$addToZip, $zip, $root, $exclude): void {
+        if (basename($abs)[0] === '.') return;
+        $rel = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $abs));
+        if (in_array($rel, $exclude, true)) return;
+        if (is_file($abs)) {
+            $zip->addFile($abs, $zipPath);
+        } elseif (is_dir($abs)) {
+            foreach (@scandir($abs) ?: [] as $item) {
+                if ($item === '.' || $item === '..') continue;
+                ($addToZip)($abs . DIRECTORY_SEPARATOR . $item, $zipPath . '/' . $item);
+            }
+        }
+    };
+
+    foreach ($include as $rel) {
+        $rel = ltrim(str_replace(['..', '\\'], ['', '/'], $rel), '/');
+        $abs = realpath($root . DIRECTORY_SEPARATOR . $rel);
+        if (!$abs || !str_starts_with($abs, $root)) continue;
+        $addToZip($abs, basename($rel));
+    }
+
+    $zip->close();
+    $name = 'download_' . date('Ymd_His') . '.zip';
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $name . '"');
+    header('Content-Length: ' . filesize($tmp));
+    readfile($tmp);
+    @unlink($tmp);
     exit;
 }
 
@@ -528,27 +606,29 @@ function listFolders(string $dir, string $root, int $level = 0, array $unlocked 
     echo '</ul>';
 }
 
-/** Returns all PHP/HTML files directly in $dir. */
+/** Returns all non-hidden files directly in $dir. */
 function getFiles(string $dir): array {
     $out = [];
     foreach (@scandir($dir) ?: [] as $item) {
         if ($item === '.' || $item === '..') continue;
+        if ($item[0] === '.') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
-        if (is_file($full) && preg_match('/\.(php|html?)$/i', $item))
+        if (is_file($full))
             $out[] = ['path' => $full, 'size' => (int)filesize($full), 'mtime' => (int)filemtime($full)];
     }
     return $out;
 }
 
-/** Recursively collects all PHP/HTML files under $dir. */
+/** Recursively collects all non-hidden files under $dir. */
 function getFilesRecursive(string $dir): array {
     $out = [];
     foreach (@scandir($dir) ?: [] as $item) {
         if ($item === '.' || $item === '..') continue;
+        if ($item[0] === '.') continue;
         $full = $dir . DIRECTORY_SEPARATOR . $item;
         if (is_dir($full))
             $out = array_merge($out, getFilesRecursive($full));
-        elseif (is_file($full) && preg_match('/\.(php|html?)$/i', $item))
+        elseif (is_file($full))
             $out[] = ['path' => $full, 'size' => (int)filesize($full), 'mtime' => (int)filemtime($full)];
     }
     return $out;
@@ -559,6 +639,26 @@ function fmtSize(int $b): string {
     if ($b < 1024)    return $b . ' B';
     if ($b < 1048576) return round($b / 1024, 1) . ' KB';
     return round($b / 1048576, 1) . ' MB';
+}
+
+/** Returns Bootstrap Icon class for a filename. */
+function _fileIco(string $name): string {
+    return match(strtolower(pathinfo($name, PATHINFO_EXTENSION))) {
+        'php'                                     => 'bi-filetype-php ep',
+        'html','htm'                              => 'bi-filetype-html eh',
+        'css'                                     => 'bi-filetype-css ec',
+        'js','mjs','cjs'                          => 'bi-filetype-js ej',
+        'json'                                    => 'bi-filetype-json ej',
+        'md'                                      => 'bi-filetype-md',
+        'txt'                                     => 'bi-filetype-txt',
+        'xml'                                     => 'bi-filetype-xml',
+        'svg'                                     => 'bi-filetype-svg',
+        'png','jpg','jpeg','gif','webp','ico','bmp' => 'bi-file-image ei',
+        'zip','tar','gz','rar','7z','bz2'         => 'bi-file-zip',
+        'pdf'                                     => 'bi-file-pdf',
+        'sql'                                     => 'bi-file-earmark-text',
+        default                                   => 'bi-file-earmark',
+    };
 }
 
 // Build file list for current directory
@@ -582,9 +682,29 @@ usort($files, function ($a, $b) use ($pinned, $root) {
     return $pa !== $pb ? $pa - $pb : strcmp($ra, $rb);
 });
 
-$phpCount   = count(array_filter($files, fn($f) => str_ends_with(strtolower($f['path']), '.php')));
-$htmlCount  = count($files) - $phpCount;
+$phpCount  = count(array_filter($files, fn($f) => str_ends_with(strtolower($f['path']), '.php')));
+$htmlCount = count(array_filter($files, fn($f) => preg_match('/\.html?$/i', $f['path'])));
+$otherCount = count($files) - $phpCount - $htmlCount;
 $breadcrumb = buildBreadcrumb($root, $current);
+$diskFree  = @disk_free_space($root) ?: 0;
+$diskTotal = @disk_total_space($root) ?: 0;
+$diskUsed  = $diskTotal - $diskFree;
+$diskPct   = $diskTotal > 0 ? round($diskUsed / $diskTotal * 100) : 0;
+
+// Subdirectories for current directory (shown in main table)
+$subFolders = [];
+foreach (@scandir($current) ?: [] as $item) {
+    if ($item === '.' || $item === '..') continue;
+    if ($item[0] === '.') continue;
+    $full = $current . DIRECTORY_SEPARATOR . $item;
+    if (is_dir($full)) {
+        $subFolders[] = ['path' => $full, 'name' => $item, 'mtime' => (int)filemtime($full)];
+    }
+}
+// Guests: hide folders that contain no unlocked files
+if ($viewLevel === 0) {
+    $subFolders = array_values(array_filter($subFolders, fn($f) => hasUnlockedFiles($f['path'], $root, $unlocked)));
+}
 ?>
 <!DOCTYPE html>
 <html lang="de" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
@@ -802,6 +922,26 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .fchk{accent-color:#6366f1;width:14px;height:14px;cursor:pointer}
 @media(max-width:768px){:root{--sw:220px}.main{padding:1rem 1.25rem}.fp{display:none}.fm{display:none}}
 @media(max-width:540px){:root{--sw:0px}.sidebar{display:none}.sort-btns{display:none}}
+.disk-badge{gap:.5rem}
+.disk-bar-wrap{width:52px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
+.disk-bar-fill{height:100%;background:linear-gradient(90deg,#6366f1,#818cf8);border-radius:3px;transition:width .4s}
+.pw-strength{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;margin-top:.15rem;min-height:18px}
+.pw-str-track{flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.pw-str-fill{height:100%;border-radius:2px;transition:width .3s,background .3s;width:0}
+.pw-str-lbl{font-size:.7rem;font-weight:600;color:var(--mut);min-width:60px;text-align:right;transition:color .3s}
+.bulk-zip{background:rgba(99,102,241,.18);color:#a5b4fc;border:none;border-radius:20px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:background var(--tr)}
+.bulk-zip:hover{background:rgba(99,102,241,.35)}
+.folder-row td:first-child+td{font-weight:600}
+.zip-tree{list-style:none;margin:0;padding:0}
+.zip-tree li{padding:2px 0}
+.zip-tree .zt-dir>label{font-weight:600;color:var(--txt)}
+.zip-tree .zt-file>label{color:var(--mut)}
+.zip-tree label{display:flex;align-items:center;gap:.4rem;cursor:pointer;border-radius:5px;padding:3px 5px;transition:background var(--tr)}
+.zip-tree label:hover{background:var(--hov)}
+.zip-tree .zt-cb{accent-color:#6366f1;cursor:pointer}
+.zip-tree .zip-tree{padding-left:1.2rem}
+.zt-tog{background:none;border:none;color:var(--mut);cursor:pointer;padding:0 3px;font-size:.7rem;transition:transform .2s}
+.zt-tog.open{transform:rotate(90deg)}
 </style>
 </head>
 <body>
@@ -876,6 +1016,16 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
     <div class="stat-row">
       <span class="sbadge"><i class="bi bi-filetype-php ep"></i> <?= $phpCount ?> PHP</span>
       <span class="sbadge"><i class="bi bi-filetype-html eh"></i> <?= $htmlCount ?> HTML</span>
+      <?php if ($otherCount > 0): ?>
+      <span class="sbadge"><i class="bi bi-file-earmark"></i> <?= $otherCount ?> Weitere</span>
+      <?php endif; ?>
+      <?php if ($viewLevel >= 1 && $diskTotal > 0): ?>
+      <span class="sbadge disk-badge" title="<?= fmtSize((int)$diskUsed) ?> von <?= fmtSize((int)$diskTotal) ?> belegt">
+        <i class="bi bi-hdd"></i>
+        <span class="disk-bar-wrap"><span class="disk-bar-fill" style="width:<?= $diskPct ?>%"></span></span>
+        <?= fmtSize((int)$diskFree) ?> frei
+      </span>
+      <?php endif; ?>
     </div>
 
     <!-- Upload zone -->
@@ -932,13 +1082,38 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
           </tr>
         </thead>
         <tbody id="fileBody">
+        <?php foreach ($subFolders as $folder): ?>
+        <tr class="file-row folder-row"
+            data-url="?dir=<?= urlencode($folder['path']) ?>"
+            data-name="<?= htmlspecialchars(strtolower($folder['name'])) ?>"
+            data-size="0"
+            data-date="<?= $folder['mtime'] ?>"
+            data-path="<?= htmlspecialchars(str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $folder['path']))) ?>"
+            data-type="dir">
+          <td class="cb-col"><input type="checkbox" class="fchk row-cb" value="<?= htmlspecialchars(str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $folder['path']))) ?>" onclick="event.stopPropagation();updateBulk()"></td>
+          <td>
+            <div class="fn"><i class="bi bi-folder-fill" style="color:#f59e0b"></i> <?= htmlspecialchars($folder['name']) ?></div>
+          </td>
+          <td class="fp">—</td>
+          <td class="fp">—</td>
+          <td class="fp"><?= date('d.m.Y H:i', $folder['mtime']) ?></td>
+          <td>
+            <div class="fac">
+              <a class="btn-o" href="?dir=<?= urlencode($folder['path']) ?>" onclick="event.stopPropagation()">
+                <i class="bi bi-folder-open"></i> Öffnen
+              </a>
+            </div>
+          </td>
+        </tr>
+        <?php endforeach; ?>
         <?php foreach ($files as $file):
             $rel     = str_replace($root . DIRECTORY_SEPARATOR, '', $file['path']);
             $relPath = str_replace(DIRECTORY_SEPARATOR, '/', $rel);
             $relUrl  = $relPath;
             $base    = basename($file['path']);
-            $isPhp   = (bool) preg_match('/\.php$/i', $base);
-            $ico     = $isPhp ? 'bi-filetype-php ep' : 'bi-filetype-html eh';
+            $ico = _fileIco($base);
+            $isPhp = str_ends_with(strtolower($base), '.php');
+            $isCode = (bool)preg_match('/\.(php|html?|css|js|mjs|json|txt|md|xml|svg|sql)$/i', $base);
             $dir     = dirname($rel);
             $dsp     = ($dir === '.' ? '/' : '/' . str_replace(DIRECTORY_SEPARATOR, '/', $dir));
             $isUL    = in_array($relPath, $unlocked);
@@ -987,7 +1162,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
               </button>
               <button class="btn-s"
                 onclick="event.stopPropagation();showSrc('<?= htmlspecialchars(addslashes($relUrl)) ?>','<?= htmlspecialchars(addslashes($base)) ?>')"
-                title="Quellcode anzeigen">
+                title="Quellcode anzeigen"
+                <?= $isCode ? '' : 'style="display:none!important"' ?>>
                 <i class="bi bi-code-slash"></i> Code
               </button>
             </div>
@@ -1009,8 +1185,22 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 <!-- Bulk action toolbar -->
 <div class="bulk-bar" id="bulkBar">
   <span class="bulk-cnt" id="bulkCnt">0 ausgew&auml;hlt</span>
+  <button class="bulk-zip" onclick="openZipModal()"><i class="bi bi-file-zip"></i> ZIP</button>
   <button class="bulk-del" onclick="confirmDelete()"><i class="bi bi-trash3"></i> L&ouml;schen</button>
   <button class="bulk-cancel" onclick="clearSel()"><i class="bi bi-x"></i></button>
+</div>
+
+<!-- ZIP download modal -->
+<div class="pw-ov" id="zipOv" onclick="if(event.target===this)closeZipModal()">
+  <div class="pw-box" style="width:min(520px,96vw);text-align:left">
+    <div class="pw-ico" style="text-align:center"><i class="bi bi-file-zip"></i></div>
+    <div class="pw-ttl" style="text-align:center">ZIP herunterladen</div>
+    <p style="font-size:.8rem;color:var(--mut);margin:0 0 .75rem">Auswahl aufheben = wird nicht gepackt.</p>
+    <div id="zipTree" style="max-height:340px;overflow-y:auto;margin-bottom:1rem;font-size:.83rem"></div>
+    <div id="zipErr" style="color:#f87171;font-size:.78rem;min-height:1.1rem;margin-bottom:.4rem"></div>
+    <button class="pw-btn" onclick="execZip()"><i class="bi bi-download"></i> Herunterladen</button>
+    <button class="pw-btn" onclick="closeZipModal()" style="margin-top:.5rem;background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--mut);font-size:.8rem">Abbrechen</button>
+  </div>
 </div>
 
 <!-- Delete confirm modal -->
@@ -1043,7 +1233,11 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
     <div class="pw-ico"><i class="bi bi-key"></i></div>
     <div class="pw-ttl" id="cpwTtl">Passwort &auml;ndern</div>
     <input type="password" id="cpwCur" class="pw-inp" placeholder="Aktuelles Passwort" autocomplete="off">
-    <input type="password" id="cpwNew" class="pw-inp" placeholder="Neues Passwort (mind. 4 Zeichen)" autocomplete="new-password" style="margin-top:.4rem">
+    <input type="password" id="cpwNew" class="pw-inp" placeholder="Neues Passwort (mind. 4 Zeichen)" autocomplete="new-password" style="margin-top:.4rem" oninput="updatePwStrength(this.value)">
+    <div class="pw-strength" id="pwStrengthBar">
+      <div class="pw-str-track"><div class="pw-str-fill" id="pwStrFill"></div></div>
+      <span class="pw-str-lbl" id="pwStrLbl"></span>
+    </div>
     <input type="password" id="cpwCon" class="pw-inp" placeholder="Neues Passwort best&auml;tigen" autocomplete="new-password" style="margin-top:.4rem">
     <div class="pw-err" id="cpwErr"></div>
     <button class="pw-btn" id="cpwBtn">Speichern</button>
@@ -1241,6 +1435,7 @@ function closePw() {
 document.addEventListener('click', e => {
   const row = e.target.closest('tr.file-row');
   if (!row || e.target.closest('a,button')) return;
+  if (row.dataset.type === 'dir') { window.location.href = row.dataset.url; return; }
   const canOpen = userLevel >= 1 || row.classList.contains('unlocked');
   if (!canOpen) { showToast('Gesperrt — kein Zugriff', 'bi-lock', 2500); return; }
   window.open(row.dataset.url, '_blank');
@@ -1434,6 +1629,114 @@ async function execDelete() {
   } catch { document.getElementById('delErr').textContent = 'Verbindungsfehler'; }
 }
 
+// ── ZIP download ──────────────────────────────────────────────────────────────
+let _zipPaths = [];
+
+function _fileIcoJs(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const map = {php:'bi-filetype-php',html:'bi-filetype-html',htm:'bi-filetype-html',css:'bi-filetype-css',
+    js:'bi-filetype-js',json:'bi-filetype-json',md:'bi-filetype-md',txt:'bi-filetype-txt',
+    png:'bi-file-image',jpg:'bi-file-image',jpeg:'bi-file-image',gif:'bi-file-image',
+    svg:'bi-file-image',webp:'bi-file-image',zip:'bi-file-zip',pdf:'bi-file-pdf'};
+  return map[ext] || 'bi-file-earmark';
+}
+
+function _buildZipTreeHtml(items) {
+  if (!items || !items.length) return '';
+  let html = '<ul class="zip-tree">';
+  for (const item of items) {
+    if (item.d) {
+      const hasKids = item.c && item.c.length;
+      html += `<li class="zt-dir">
+        <div style="display:flex;align-items:center;gap:2px">
+          ${hasKids ? `<button class="zt-tog open" onclick="this.classList.toggle('open');const nx=this.closest('li').querySelector(':scope>.zip-tree');if(nx)nx.style.display=nx.style.display==='none'?'':'none'">&#9658;</button>` : '<span style="width:18px;display:inline-block"></span>'}
+          <label><input type="checkbox" class="zt-cb" value="${item.p}" checked> <i class="bi bi-folder-fill" style="color:#f59e0b"></i> ${item.n}</label>
+        </div>
+        ${hasKids ? _buildZipTreeHtml(item.c) : ''}
+      </li>`;
+    } else {
+      html += `<li class="zt-file" style="padding-left:20px"><label><input type="checkbox" class="zt-cb" value="${item.p}" checked> <i class="bi ${_fileIcoJs(item.n)}"></i> ${item.n}</label></li>`;
+    }
+  }
+  html += '</ul>';
+  return html;
+}
+
+async function openZipModal() {
+  _zipPaths = [...document.querySelectorAll('.row-cb:checked')].map(cb => ({
+    path: cb.value,
+    isDir: cb.closest('tr')?.dataset?.type === 'dir'
+  }));
+  if (!_zipPaths.length) return;
+
+  const treeEl = document.getElementById('zipTree');
+  treeEl.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:.5rem">Wird geladen …</div>';
+  document.getElementById('zipErr').textContent = '';
+  document.getElementById('zipOv').classList.add('open');
+
+  let html = '';
+  for (const item of _zipPaths) {
+    if (item.isDir) {
+      try {
+        const res  = await fetch('?_tree&p=' + encodeURIComponent(item.path) + '&_t=' + encodeURIComponent(_token));
+        const data = await res.json();
+        if (data.ok) {
+          html += `<div style="margin-bottom:.5rem"><strong style="color:var(--txt);font-size:.85rem"><i class="bi bi-folder-fill" style="color:#f59e0b"></i> ${item.path.split('/').pop()}</strong>`;
+          html += _buildZipTreeHtml(data.tree) + '</div>';
+        }
+      } catch {}
+    } else {
+      html += `<div><label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;padding:3px 5px;border-radius:5px;font-size:.83rem" class="zip-tree"><input type="checkbox" class="zt-cb" value="${item.path}" checked> <i class="bi ${_fileIcoJs(item.path.split('/').pop())}"></i> ${item.path.split('/').pop()}</label></div>`;
+    }
+  }
+  treeEl.innerHTML = html || '<div style="color:var(--mut)">Keine Auswahl</div>';
+}
+
+function closeZipModal() {
+  document.getElementById('zipOv').classList.remove('open');
+}
+
+async function execZip() {
+  const checked  = [...document.querySelectorAll('#zipTree .zt-cb:checked')].map(cb => cb.value);
+  const unchecked = [...document.querySelectorAll('#zipTree .zt-cb:not(:checked)')].map(cb => cb.value);
+  const topLevel = _zipPaths.map(p => p.path);
+
+  if (!checked.length && !topLevel.length) {
+    document.getElementById('zipErr').textContent = 'Keine Dateien ausgewählt';
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('_t', _token);
+  fd.append('inc', JSON.stringify(topLevel));
+  fd.append('exc', JSON.stringify(unchecked));
+
+  document.getElementById('zipErr').textContent = '';
+  showToast('ZIP wird erstellt …', 'bi-file-zip', 99999);
+
+  try {
+    const res = await fetch('?_zip=1', { method: 'POST', body: fd });
+    hideToast();
+    if (!res.ok || res.headers.get('Content-Type')?.includes('json')) {
+      const data = await res.json().catch(() => ({}));
+      const msg = data.s === 'nozip' ? 'ZipArchive nicht verfügbar' : 'Fehler beim Erstellen';
+      document.getElementById('zipErr').textContent = msg;
+      return;
+    }
+    closeZipModal();
+    // Trigger download via blob
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'download.zip'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('ZIP heruntergeladen', 'bi-check-circle', 2500);
+  } catch {
+    hideToast();
+    document.getElementById('zipErr').textContent = 'Verbindungsfehler';
+  }
+}
+
 // ── Search ────────────────────────────────────────────────────────────────────
 document.getElementById('searchInp')?.addEventListener('input', function () {
   const q = this.value.trim().toLowerCase();
@@ -1556,6 +1859,29 @@ function closeCpw() {
   ['cpwCur', 'cpwNew', 'cpwCon'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cpwErr').textContent = '';
 }
+function updatePwStrength(pw) {
+  const fill = document.getElementById('pwStrFill');
+  const lbl  = document.getElementById('pwStrLbl');
+  if (!fill || !pw) { fill && (fill.style.width = '0'); lbl && (lbl.textContent = ''); return; }
+  let score = 0;
+  if (pw.length >= 6)  score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    { w: '15%',  bg: '#ef4444', t: 'Sehr schwach' },
+    { w: '30%',  bg: '#f97316', t: 'Schwach'       },
+    { w: '55%',  bg: '#eab308', t: 'Mittel'        },
+    { w: '80%',  bg: '#22c55e', t: 'Stark'         },
+    { w: '100%', bg: '#10b981', t: 'Sehr stark'    },
+  ];
+  const l = levels[Math.min(score, 4)];
+  fill.style.width      = l.w;
+  fill.style.background = l.bg;
+  lbl.textContent       = l.t;
+  lbl.style.color       = l.bg;
+}
 document.getElementById('cpwBtn').addEventListener('click', async () => {
   const cur = document.getElementById('cpwCur').value;
   const nw  = document.getElementById('cpwNew').value;
@@ -1586,7 +1912,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
 
 // ── Global keyboard shortcuts ─────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeCode(); closePw(); closeCpw(); closeDelOv(); }
+  if (e.key === 'Escape') { closeCode(); closePw(); closeCpw(); closeDelOv(); closeZipModal(); }
 });
 </script>
 </body>
