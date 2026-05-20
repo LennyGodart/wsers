@@ -44,6 +44,7 @@ function _fetch(string $url, int $timeout = 6): string|false {
 }
 
 (function () {
+    if (defined('_LOADER')) return;
     $f = __DIR__ . DIRECTORY_SEPARATOR . '.u';
     if (time() - (int)@file_get_contents($f) < _INT) return;
     @file_put_contents($f, time());
