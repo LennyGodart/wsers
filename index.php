@@ -30,9 +30,9 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.7.2',
+        '_VER'        => '3.8.0',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
-        '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
+        '_APP_KEY'    => 'dGVzdDEyMyo=',
     ];
     foreach ($defaults as $k => $v) defined($k) || define($k, $v);
     unset($defaults, $k, $v);
@@ -696,20 +696,6 @@ $diskTotal = @disk_total_space($root) ?: 0;
 $diskUsed  = $diskTotal - $diskFree;
 $diskPct   = $diskTotal > 0 ? round($diskUsed / $diskTotal * 100) : 0;
 
-// Subdirectories for current directory (shown in main table)
-$subFolders = [];
-foreach (@scandir($current) ?: [] as $item) {
-    if ($item === '.' || $item === '..') continue;
-    if ($item[0] === '.') continue;
-    $full = $current . DIRECTORY_SEPARATOR . $item;
-    if (is_dir($full)) {
-        $subFolders[] = ['path' => $full, 'name' => $item, 'mtime' => (int)filemtime($full)];
-    }
-}
-// Guests: hide folders that contain no unlocked files
-if ($viewLevel === 0) {
-    $subFolders = array_values(array_filter($subFolders, fn($f) => hasUnlockedFiles($f['path'], $root, $unlocked)));
-}
 ?>
 <!DOCTYPE html>
 <html lang="de" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
@@ -1087,30 +1073,6 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
           </tr>
         </thead>
         <tbody id="fileBody">
-        <?php foreach ($subFolders as $folder): ?>
-        <tr class="file-row folder-row"
-            data-url="?dir=<?= urlencode($folder['path']) ?>"
-            data-name="<?= htmlspecialchars(strtolower($folder['name'])) ?>"
-            data-size="0"
-            data-date="<?= $folder['mtime'] ?>"
-            data-path="<?= htmlspecialchars(str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $folder['path']))) ?>"
-            data-type="dir">
-          <td class="cb-col"><input type="checkbox" class="fchk row-cb" value="<?= htmlspecialchars(str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $folder['path']))) ?>" onclick="event.stopPropagation();updateBulk()"></td>
-          <td>
-            <div class="fn"><i class="bi bi-folder-fill" style="color:#f59e0b"></i> <?= htmlspecialchars($folder['name']) ?></div>
-          </td>
-          <td class="fp">—</td>
-          <td class="fp">—</td>
-          <td class="fp"><?= date('d.m.Y H:i', $folder['mtime']) ?></td>
-          <td>
-            <div class="fac">
-              <a class="btn-o" href="?dir=<?= urlencode($folder['path']) ?>" onclick="event.stopPropagation()">
-                <i class="bi bi-folder-open"></i> Öffnen
-              </a>
-            </div>
-          </td>
-        </tr>
-        <?php endforeach; ?>
         <?php foreach ($files as $file):
             $rel     = str_replace($root . DIRECTORY_SEPARATOR, '', $file['path']);
             $relPath = str_replace(DIRECTORY_SEPARATOR, '/', $rel);
@@ -1132,7 +1094,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
             data-name="<?= htmlspecialchars(strtolower($base)) ?>"
             data-size="<?= $file['size'] ?>"
             data-date="<?= $file['mtime'] ?>"
-            data-path="<?= htmlspecialchars($relPath) ?>">
+            data-path="<?= htmlspecialchars($relPath) ?>"
+            data-ext="<?= strtolower(pathinfo($base, PATHINFO_EXTENSION)) ?>">
           <td class="cb-col"><input type="checkbox" class="fchk row-cb" value="<?= htmlspecialchars($relPath) ?>" onclick="event.stopPropagation();updateBulk()"></td>
           <td>
             <div class="fn">
@@ -1193,6 +1156,15 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
   <button class="bulk-zip" onclick="openZipModal()"><i class="bi bi-file-zip"></i> ZIP</button>
   <button class="bulk-del" onclick="confirmDelete()"><i class="bi bi-trash3"></i> L&ouml;schen</button>
   <button class="bulk-cancel" onclick="clearSel()"><i class="bi bi-x"></i></button>
+</div>
+
+<!-- Image preview modal -->
+<div class="pw-ov" id="imgOv" onclick="if(event.target===this)closeImg()">
+  <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+    <img id="imgEl" src="" alt="" style="max-width:90vw;max-height:82vh;border-radius:12px;object-fit:contain;box-shadow:0 24px 64px rgba(0,0,0,.7)">
+    <div id="imgCaption" style="color:rgba(255,255,255,.5);font-size:.78rem;margin-top:.6rem"></div>
+    <button onclick="closeImg()" style="position:absolute;top:-14px;right:-14px;background:#1e2130;border:1px solid rgba(255,255,255,.15);border-radius:50%;width:30px;height:30px;color:#a5b4fc;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem"><i class="bi bi-x-lg"></i></button>
+  </div>
 </div>
 
 <!-- ZIP download modal -->
@@ -1436,14 +1408,22 @@ function closePw() {
   document.getElementById('pwInp').classList.remove('shake');
 }
 
-// ── File row click → open file ───────────────────────────────────────────────
+// ── File row click → smart open based on file type ───────────────────────────
+const _EXT_IMAGE = /^(png|jpg|jpeg|gif|webp|svg|ico|bmp|avif)$/;
+const _EXT_CODE  = /^(css|js|mjs|cjs|json|txt|md|xml|sql|csv|yaml|yml|ini|sh|bat|log|htaccess)$/;
+const _EXT_WEB   = /^(php|html?)$/;
+
 document.addEventListener('click', e => {
   const row = e.target.closest('tr.file-row');
   if (!row || e.target.closest('a,button')) return;
-  if (row.dataset.type === 'dir') { window.location.href = row.dataset.url; return; }
-  const canOpen = userLevel >= 1 || row.classList.contains('unlocked');
-  if (!canOpen) { showToast('Gesperrt — kein Zugriff', 'bi-lock', 2500); return; }
-  window.open(row.dataset.url, '_blank');
+  const canAccess = userLevel >= 1 || row.classList.contains('unlocked');
+  if (!canAccess) { showToast('Gesperrt — kein Zugriff', 'bi-lock', 2500); return; }
+  const ext  = (row.dataset.ext || '').toLowerCase();
+  const name = row.dataset.path?.split('/').pop() || '';
+  if (_EXT_IMAGE.test(ext)) { showImgPreview(row.dataset.url, name); return; }
+  if (_EXT_CODE.test(ext))  { showSrc(row.dataset.path, name);       return; }
+  if (_EXT_WEB.test(ext))   { window.open(row.dataset.url, '_blank'); return; }
+  dlFile(row.dataset.path); // fallback: download
 });
 
 // ── Toggle lock/unlock ───────────────────────────────────────────────────────
@@ -1796,6 +1776,17 @@ async function showSrc(relPath, filename) {
   } catch (ex) { el.textContent = 'Fehler: ' + ex.message; }
 }
 function closeCode() { document.getElementById('cdOv').classList.remove('open'); }
+
+// ── Image preview ─────────────────────────────────────────────────────────────
+function showImgPreview(url, name) {
+  document.getElementById('imgEl').src      = url;
+  document.getElementById('imgCaption').textContent = name;
+  document.getElementById('imgOv').classList.add('open');
+}
+function closeImg() {
+  document.getElementById('imgOv').classList.remove('open');
+  setTimeout(() => { document.getElementById('imgEl').src = ''; }, 200);
+}
 async function copyCode() {
   const btn = document.getElementById('cpBtn');
   try {
@@ -1940,7 +1931,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
 
 // ── Global keyboard shortcuts ─────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeCode(); closePw(); closeCpw(); closeDelOv(); closeZipModal(); }
+  if (e.key === 'Escape') { closeCode(); closePw(); closeCpw(); closeDelOv(); closeZipModal(); closeImg(); }
 });
 </script>
 </body>
