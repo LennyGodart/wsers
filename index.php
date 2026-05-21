@@ -5,8 +5,7 @@
  * Full source code available at:
  * https://github.com/LennyGodart/wsers
  *
- * The entire codebase is openly auditable – no hidden behaviour,
- * no backdoors, no telemetry of any kind.
+ * The entire codebase is openly auditable
  *
  * Features:
  *   - Password-protected file browser (two levels: Owner + Admin)
@@ -642,7 +641,7 @@ function listFolders(string $dir, string $root, int $level = 0, array $unlocked 
            . htmlspecialchars($f['name']) . '</a>';
         if ($vl >= 1) {
             $relFolder = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $rp));
-            echo '<button class="fzip" onclick="event.stopPropagation();event.preventDefault();zipFolderDirect(' . json_encode($relFolder) . ',' . json_encode($f['name']) . ')" title="Als ZIP herunterladen"><i class="bi bi-file-zip"></i></button>';
+            echo '<button class="fzip" type="button" data-fzip="' . htmlspecialchars($relFolder, ENT_QUOTES) . '" data-fname="' . htmlspecialchars($f['name'], ENT_QUOTES) . '" title="Als ZIP herunterladen"><i class="bi bi-file-zip"></i></button>';
         }
         echo '</div>';
 
@@ -1311,6 +1310,15 @@ document.querySelectorAll('.tb').forEach(btn => {
   tgt.addEventListener('hide.bs.collapse', () => btn.querySelector('.ti')?.classList.remove('open'));
 });
 
+// ── Sidebar ZIP buttons ───────────────────────────────────────────────────────
+document.querySelector('.sidebar')?.addEventListener('click', e => {
+  const btn = e.target.closest('[data-fzip]');
+  if (!btn) return;
+  e.stopPropagation();
+  e.preventDefault();
+  zipFolderDirect(btn.dataset.fzip, btn.dataset.fname);
+});
+
 // ── Editable brand name ──────────────────────────────────────────────────────
 (function () {
   const stored = localStorage.getItem('ws_brand');
@@ -1729,6 +1737,15 @@ async function openZipModal(preSelected = null) {
   }
   treeEl.innerHTML = html || '<div style="color:var(--mut)">Keine Auswahl</div>';
 }
+
+// Cascade check/uncheck to all children when a folder checkbox changes
+document.getElementById('zipTree').addEventListener('change', e => {
+  const cb = e.target;
+  if (!cb.classList.contains('zt-cb')) return;
+  const li = cb.closest('li');
+  if (!li) return;
+  li.querySelectorAll('.zt-cb').forEach(child => { child.checked = cb.checked; });
+});
 
 function closeZipModal() {
   document.getElementById('zipOv').classList.remove('open');
