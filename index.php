@@ -5,8 +5,7 @@
  * Full source code available at:
  * https://github.com/LennyGodart/wsers
  *
- * The entire codebase is openly auditable – no hidden behaviour,
- * no backdoors, no telemetry of any kind.
+ * The entire codebase is openly auditable
  *
  * Features:
  *   - Password-protected file browser (two levels: Owner + Admin)
@@ -31,7 +30,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.8.6',
+        '_VER'        => '3.8.9',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -223,13 +222,17 @@ if (isset($_GET['_update']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['s' => 'err']); exit;
     }
 
-    // Reset update cache so banner doesn't reappear immediately after reload
-    $updCfg            = _loadConfig();
-    $updCfg['_uc_av']  = false;
-    $updCfg['_uc_ts']  = time();
+    $written = file_put_contents(__FILE__, _preserveConfig($newSource));
+    if ($written === false) {
+        echo json_encode(['s' => 'err', 'msg' => 'Keine Schreibrechte auf index.php']); exit;
+    }
+
+    // Reset update cache so banner doesn't reappear after reload
+    $updCfg           = _loadConfig();
+    $updCfg['_uc_av'] = false;
+    $updCfg['_uc_ts'] = time();
     _saveConfig($updCfg);
 
-    @file_put_contents(__FILE__, _preserveConfig($newSource));
     echo json_encode(['s' => 'ok']); exit;
 }
 
@@ -1740,11 +1743,17 @@ async function zipFolderDirect(relPath, name) {
   try {
     const res = await fetch('?_zip=1', { method: 'POST', body: fd });
     hideToast();
-    if (!res.ok) { showToast('Fehler beim Erstellen', 'bi-x', 3000); return; }
+    const ct = res.headers.get('Content-Type') || '';
+    if (!res.ok || ct.includes('json')) {
+      const d = await res.json().catch(() => ({}));
+      showToast(d.s === 'nozip' ? 'ZipArchive nicht verfügbar' : 'Fehler beim Erstellen', 'bi-x', 3000);
+      return;
+    }
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = name + '.zip'; a.click();
+    a.href = url; a.download = name + '.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('ZIP heruntergeladen', 'bi-check-circle', 2500);
   } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
@@ -1782,7 +1791,8 @@ async function execZip() {
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = 'download.zip'; a.click();
+    a.href = url; a.download = 'download.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('ZIP heruntergeladen', 'bi-check-circle', 2500);
   } catch {
@@ -1907,8 +1917,10 @@ async function triggerUpdate() {
       ok:   ['Update installiert! Wird neu geladen …', 'bi-check-circle-fill', 4000],
       err:  ['GitHub nicht erreichbar.',                    'bi-exclamation-triangle', 3000],
       auth: ['Session abgelaufen.',                         'bi-lock', 3000],
+      perm: ['Keine Schreibrechte auf index.php',           'bi-shield-x', 4000],
     };
-    const [msg, ico, dur] = msgs[data.s] || ['Unbekannter Fehler', 'bi-x', 3000];
+    const key = data.s === 'err' && data.msg ? 'perm' : data.s;
+    const [msg, ico, dur] = msgs[key] || ['Unbekannter Fehler', 'bi-x', 3000];
     showToast(msg, ico, dur);
     if (data.s === 'ok') setTimeout(() => location.reload(), 2000);
   } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
