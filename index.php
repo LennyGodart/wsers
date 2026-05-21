@@ -5,7 +5,8 @@
  * Full source code available at:
  * https://github.com/LennyGodart/wsers
  *
- * The entire codebase is openly auditable
+ * The entire codebase is openly auditable – no hidden behaviour,
+ * no backdoors, no telemetry of any kind.
  *
  * Features:
  *   - Password-protected file browser (two levels: Owner + Admin)
@@ -1699,8 +1700,8 @@ function _buildZipTreeHtml(items) {
   return html;
 }
 
-async function openZipModal() {
-  _zipPaths = [...document.querySelectorAll('.row-cb:checked')].map(cb => ({
+async function openZipModal(preSelected = null) {
+  _zipPaths = preSelected ?? [...document.querySelectorAll('.row-cb:checked')].map(cb => ({
     path: cb.value,
     isDir: cb.closest('tr')?.dataset?.type === 'dir'
   }));
@@ -1733,30 +1734,9 @@ function closeZipModal() {
   document.getElementById('zipOv').classList.remove('open');
 }
 
-// Zip a single folder directly (from sidebar button)
-async function zipFolderDirect(relPath, name) {
-  showToast('ZIP wird erstellt …', 'bi-file-zip', 99999);
-  const fd = new FormData();
-  fd.append('_t', _token);
-  fd.append('inc', JSON.stringify([relPath]));
-  fd.append('exc', JSON.stringify([]));
-  try {
-    const res = await fetch('?_zip=1', { method: 'POST', body: fd });
-    hideToast();
-    const ct = res.headers.get('Content-Type') || '';
-    if (!res.ok || ct.includes('json')) {
-      const d = await res.json().catch(() => ({}));
-      showToast(d.s === 'nozip' ? 'ZipArchive nicht verfügbar' : 'Fehler beim Erstellen', 'bi-x', 3000);
-      return;
-    }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = name + '.zip';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('ZIP heruntergeladen', 'bi-check-circle', 2500);
-  } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
+// Zip a folder from sidebar — opens the same modal as file selection
+function zipFolderDirect(relPath, name) {
+  openZipModal([{ path: relPath, isDir: true }]);
 }
 
 async function execZip() {
