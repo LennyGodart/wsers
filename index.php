@@ -31,7 +31,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '2.7.0',
+        '_VER'        => '3.8.6',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
