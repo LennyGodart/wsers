@@ -5,7 +5,8 @@
  * Full source code available at:
  * https://github.com/LennyGodart/wsers
  *
- * The entire codebase is openly auditable
+ * The entire codebase is openly auditable – no hidden behaviour,
+ * no backdoors, no telemetry of any kind.
  *
  * Features:
  *   - Password-protected file browser (two levels: Owner + Admin)
@@ -30,9 +31,9 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.8.4',
+        '_VER'        => '2.7.0',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
-        '_APP_KEY'    => 'dGVzdDEyMyo=',
+        '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
     ];
     foreach ($defaults as $k => $v) defined($k) || define($k, $v);
     unset($defaults, $k, $v);
@@ -57,6 +58,25 @@ function _loadConfig(): array {
 function _saveConfig(array $data): bool {
     $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     return file_put_contents(_wsPath(), $json, LOCK_EX) !== false;
+}
+
+/**
+ * Ensures .htaccess in the app directory contains a block that denies
+ * direct HTTP access to .wsconfig. Safe to call on every request —
+ * only writes when the managed block is missing.
+ */
+function _ensureHtaccess(): void {
+    $htPath  = realpath(__DIR__) . DIRECTORY_SEPARATOR . '.htaccess';
+    $marker  = '# WSers-managed-begin';
+    $current = @file_get_contents($htPath) ?: '';
+    if (str_contains($current, $marker)) return; // already present
+
+    $block = "# WSers-managed-begin\n"
+           . "<Files \".wsconfig\">\n  Require all denied\n</Files>\n"
+           . "# WSers-managed-end";
+
+    $new = $current !== '' ? rtrim($current) . "\n\n" . $block : $block;
+    @file_put_contents($htPath, $new, LOCK_EX);
 }
 
 // ── Updater helpers ──────────────────────────────────────────────────────────
@@ -126,6 +146,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // CSRF token tied to the current session and app key
 $csrf = hash_hmac('sha256', session_id(), _APP_KEY);
 $root = realpath(__DIR__);
+_ensureHtaccess();
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -201,6 +222,12 @@ if (isset($_GET['_update']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$newSource || strlen($newSource) < 500) {
         echo json_encode(['s' => 'err']); exit;
     }
+
+    // Reset update cache so banner doesn't reappear immediately after reload
+    $updCfg            = _loadConfig();
+    $updCfg['_uc_av']  = false;
+    $updCfg['_uc_ts']  = time();
+    _saveConfig($updCfg);
 
     @file_put_contents(__FILE__, _preserveConfig($newSource));
     echo json_encode(['s' => 'ok']); exit;
@@ -430,6 +457,18 @@ if (isset($_GET['_changepw']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     echo json_encode(['ok' => true]); exit;
 }
 
+// ── Set brand name ────────────────────────────────────────────────────────────
+if (isset($_GET['_setbrand']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!_checkAuth(1)) { http_response_code(403); echo json_encode(['ok' => false]); exit; }
+    $name = mb_substr(trim($_POST['n'] ?? ''), 0, 40);
+    $cfg  = _loadConfig();
+    if ($name === '' || $name === 'UserName') unset($cfg['brand']);
+    else $cfg['brand'] = $name;
+    _saveConfig($cfg);
+    echo json_encode(['ok' => true]); exit;
+}
+
 // ── Delete file(s) ────────────────────────────────────────────────────────────
 if (isset($_GET['_delete']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
@@ -512,12 +551,10 @@ if (isset($_GET['dir'])) {
 $darkMode    = isset($_COOKIE['dk']) && $_COOKIE['dk'] === '1';
 $isDefaultPw = hash('sha256', base64_decode(_getOwnerPw())) === hash('sha256', 'owner123');
 $wsState     = _loadConfig();
+$brand       = $wsState['brand'] ?? 'UserName';
 $unlocked    = $wsState['unlocked'] ?? [];
 $pinned      = $wsState['pinned']   ?? [];
 $notes       = $wsState['notes']    ?? [];
-
-// index.php is always accessible (it's the manager itself)
-if (!in_array('index.php', $unlocked)) $unlocked[] = 'index.php';
 
 $viewLevel    = _getLevel();
 $sessionToken = ($viewLevel > 0 && !empty($_SESSION['ws_token'])) ? $_SESSION['ws_token'] : '';
@@ -599,6 +636,10 @@ function listFolders(string $dir, string $root, int $level = 0, array $unlocked 
         echo '<a class="fl-link" href="?dir=' . urlencode($f['path']) . '">'
            . '<i class="bi bi-folder' . ($isOpen ? '-open' : '') . ' fic"></i> '
            . htmlspecialchars($f['name']) . '</a>';
+        if ($vl >= 1) {
+            $relFolder = str_replace(DIRECTORY_SEPARATOR, '/', str_replace($root . DIRECTORY_SEPARATOR, '', $rp));
+            echo '<button class="fzip" onclick="event.stopPropagation();event.preventDefault();zipFolderDirect(' . json_encode($relFolder) . ',' . json_encode($f['name']) . ')" title="Als ZIP herunterladen"><i class="bi bi-file-zip"></i></button>';
+        }
         echo '</div>';
 
         if ($hasSub) {
@@ -702,7 +743,7 @@ $diskPct   = $diskTotal > 0 ? round($diskUsed / $diskTotal * 100) : 0;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UserName &middot; Explorer</title>
+<title><?= htmlspecialchars($brand) ?> &middot; Explorer</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" rel="stylesheet">
@@ -933,6 +974,9 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .zip-tree .zip-tree{padding-left:1.2rem}
 .zt-tog{background:none;border:none;color:var(--mut);cursor:pointer;padding:0 3px;font-size:.7rem;transition:transform .2s}
 .zt-tog.open{transform:rotate(90deg)}
+.fr:hover .fzip{opacity:1}
+.fzip{opacity:0;background:none;border:none;color:var(--stxt);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:.75rem;flex-shrink:0;transition:opacity var(--tr),color var(--tr),background var(--tr);margin-right:4px}
+.fzip:hover{color:#a5b4fc;background:rgba(99,102,241,.2)}
 </style>
 </head>
 <body>
@@ -940,7 +984,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 <header class="topbar">
   <div class="tb-brand">
     <div class="logo-ico"><i class="bi bi-folder2-open"></i></div>
-    <span class="brand-nm" id="brandNm" title="Klicken zum Umbenennen">UserName</span>
+    <span class="brand-nm" id="brandNm" title="Klicken zum Umbenennen"><?= htmlspecialchars($brand) ?></span>
     <span style="opacity:.4;font-weight:400;font-size:.95rem">&nbsp;&middot; Explorer</span>
   </div>
   <div class="tb-right">
@@ -1266,7 +1310,7 @@ document.querySelectorAll('.tb').forEach(btn => {
 // ── Editable brand name ──────────────────────────────────────────────────────
 (function () {
   const stored = localStorage.getItem('ws_brand');
-  if (stored) {
+  if (stored && document.getElementById('brandNm').textContent === 'UserName') {
     document.getElementById('brandNm').textContent = stored;
     document.title = stored + ' \u00B7 Explorer';
   }
@@ -1288,6 +1332,11 @@ document.querySelector('.tb-brand').addEventListener('click', e => {
     sp.id = 'brandNm'; sp.className = 'brand-nm';
     sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
     inp.replaceWith(sp);
+    if (userLevel >= 1) {
+      const fd = new FormData();
+      fd.append('_t', _token); fd.append('n', val);
+      fetch('?_setbrand=1', { method: 'POST', body: fd }).catch(() => {});
+    }
   }
   inp.addEventListener('blur', save);
   inp.addEventListener('keydown', e => {
@@ -1679,6 +1728,26 @@ async function openZipModal() {
 
 function closeZipModal() {
   document.getElementById('zipOv').classList.remove('open');
+}
+
+// Zip a single folder directly (from sidebar button)
+async function zipFolderDirect(relPath, name) {
+  showToast('ZIP wird erstellt …', 'bi-file-zip', 99999);
+  const fd = new FormData();
+  fd.append('_t', _token);
+  fd.append('inc', JSON.stringify([relPath]));
+  fd.append('exc', JSON.stringify([]));
+  try {
+    const res = await fetch('?_zip=1', { method: 'POST', body: fd });
+    hideToast();
+    if (!res.ok) { showToast('Fehler beim Erstellen', 'bi-x', 3000); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = name + '.zip'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('ZIP heruntergeladen', 'bi-check-circle', 2500);
+  } catch { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); }
 }
 
 async function execZip() {
