@@ -30,7 +30,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.9.4',
+        '_VER'        => '3.9.5',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY' => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -1334,7 +1334,7 @@ document.querySelector('.tb-brand').addEventListener('click', e => {
   function save() {
     if (done) return; done = true;
     const val = inp.value.trim() || tgt.textContent;
-    document.title = val + ' · Explorer';
+    document.title = val + ' &middot; Explorer';
     const sp = document.createElement('span');
     sp.id = 'brandNm'; sp.className = 'brand-nm';
     sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
@@ -1415,7 +1415,7 @@ function applyLevel(lvl, announce) {
     badge.style.borderColor = lvl >= 2 ? 'rgba(99,102,241,.4)'  : 'rgba(16,185,129,.4)';
     badge.style.color       = lvl >= 2 ? '#a5b4fc' : '#6ee7b7';
     if (announce) {
-      showToast((lvl >= 2 ? 'Admin' : 'Owner') + ' – wird neu geladen ...', lvl >= 2 ? 'bi-shield-lock-fill' : 'bi-shield-check');
+      showToast((lvl >= 2 ? 'Admin' : 'Owner') + ' \u2013 wird neu geladen ...', lvl >= 2 ? 'bi-shield-lock-fill' : 'bi-shield-check');
       setTimeout(() => location.reload(), 900);
     }
   } else {
@@ -1472,7 +1472,7 @@ document.addEventListener('click', e => {
   const row = e.target.closest('tr.file-row');
   if (!row || e.target.closest('a,button')) return;
   const canAccess = userLevel >= 1 || row.classList.contains('unlocked');
-  if (!canAccess) { showToast('Gesperrt — kein Zugriff', 'bi-lock', 2500); return; }
+  if (!canAccess) { showToast('Gesperrt \u2014 kein Zugriff', 'bi-lock', 2500); return; }
   const ext  = (row.dataset.ext || '').toLowerCase();
   const name = row.dataset.path?.split('/').pop() || '';
   if (_EXT_IMAGE.test(ext)) { showImgPreview(row.dataset.url, name); return; }
@@ -1495,7 +1495,7 @@ async function toggleFile(btn, relPath) {
     if (data.unlocked) {
       row.classList.add('unlocked');
       i.className = 'bi bi-lock'; s.textContent = 'Sperren'; btn.title = 'Sperren';
-      showToast('Freigegeben für Besucher', 'bi-unlock', 2500);
+      showToast('Freigegeben f\u00fcr Besucher', 'bi-unlock', 2500);
     } else {
       row.classList.remove('unlocked');
       i.className = 'bi bi-unlock'; s.textContent = 'Freigeben'; btn.title = 'Freigeben';
@@ -1595,7 +1595,7 @@ async function uploadFiles(fileList) {
       `<div class="up-item ${f.ok ? 'ok' : 'err'}"><i class="bi ${f.ok ? 'bi-check2' : 'bi-x'}"></i>${f.n}${f.s === 'type' ? ' (Typ nicht erlaubt)' : ''}</div>`
     ).join('');
     const ok = (data.files || []).filter(f => f.ok).length;
-    showToast(ok + ' Datei(en) hochgeladen – wird neu geladen ...', 'bi-check-circle', 2500);
+    showToast(ok + ' Datei(en) hochgeladen \u2013 wird neu geladen ...', 'bi-check-circle', 2500);
     if (ok > 0) setTimeout(() => location.reload(), 2000);
   } catch { hideToast(); showToast('Upload-Fehler', 'bi-wifi-off', 3000); }
 }
@@ -1605,7 +1605,7 @@ function updateBulk() {
   const checked = [...document.querySelectorAll('.row-cb:checked')];
   const bar     = document.getElementById('bulkBar');
   const cnt     = document.getElementById('bulkCnt');
-  cnt.textContent = checked.length + ' ausgewählt';
+  cnt.textContent = checked.length + ' ausgew\u00e4hlt';
   bar.classList.toggle('show', checked.length > 0);
   const all   = document.getElementById('cbAll');
   const total = document.querySelectorAll('.row-cb').length;
@@ -1629,9 +1629,9 @@ function confirmDelete() {
   if (!_delPaths.length) return;
   const multi = _delPaths.length > 1;
   document.getElementById('delTtl').textContent = multi
-    ? _delPaths.length + ' Dateien wirklich löschen?'
-    : '"' + _delPaths[0].split('/').pop() + '" wirklich löschen?';
-  document.getElementById('delInfo').textContent = multi ? 'Passwort erforderlich für Mehrfach-Löschung.' : '';
+    ? _delPaths.length + ' Dateien wirklich l\u00f6schen?'
+    : '"' + _delPaths[0].split('/').pop() + '" wirklich l\u00f6schen?';
+  document.getElementById('delInfo').textContent = multi ? 'Passwort erforderlich f\u00fcr Mehrfach-L\u00f6schung.' : '';
   const pwInp = document.getElementById('delPw');
   pwInp.style.display = multi ? '' : 'none';
   pwInp.value = '';
@@ -1665,7 +1665,7 @@ async function execDelete() {
     data.deleted.forEach(rel => {
       document.querySelectorAll(`tr.file-row[data-path="${CSS.escape(rel)}"]`).forEach(r => r.remove());
     });
-    showToast(data.deleted.length + ' Datei(en) gelöscht', 'bi-trash3', 2500);
+    showToast(data.deleted.length + ' Datei(en) gel\u00f6scht', 'bi-trash3', 2500);
   } catch { document.getElementById('delErr').textContent = 'Verbindungsfehler'; }
 }
 
@@ -1710,7 +1710,7 @@ async function openZipModal(preSelected = null) {
   if (!_zipPaths.length) return;
 
   const treeEl = document.getElementById('zipTree');
-  treeEl.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:.5rem">Wird geladen …</div>';
+  treeEl.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:.5rem">Wird geladen \u2026</div>';
   document.getElementById('zipErr').textContent = '';
   document.getElementById('zipOv').classList.add('open');
 
@@ -1745,7 +1745,7 @@ function closeZipModal() {
   document.getElementById('zipOv').classList.remove('open');
 }
 
-// Zip a folder from sidebar — opens the same modal as file selection
+// Zip a folder from sidebar \u2014 opens the same modal as file selection
 function zipFolderDirect(relPath, name) {
   openZipModal([{ path: relPath, isDir: true }]);
 }
@@ -1756,7 +1756,7 @@ async function execZip() {
   const topLevel = _zipPaths.map(p => p.path);
 
   if (!checked.length && !topLevel.length) {
-    document.getElementById('zipErr').textContent = 'Keine Dateien ausgewählt';
+    document.getElementById('zipErr').textContent = 'Keine Dateien ausgew\u00e4hlt';
     return;
   }
 
@@ -1766,14 +1766,14 @@ async function execZip() {
   fd.append('exc', JSON.stringify(unchecked));
 
   document.getElementById('zipErr').textContent = '';
-  showToast('ZIP wird erstellt …', 'bi-file-zip', 99999);
+  showToast('ZIP wird erstellt \u2026', 'bi-file-zip', 99999);
 
   try {
     const res = await fetch('?_zip=1', { method: 'POST', body: fd });
     hideToast();
     if (!res.ok || res.headers.get('Content-Type')?.includes('json')) {
       const data = await res.json().catch(() => ({}));
-      const msg = data.s === 'nozip' ? 'ZipArchive nicht verfügbar' : 'Fehler beim Erstellen';
+      const msg = data.s === 'nozip' ? 'ZipArchive nicht verf\u00fcgbar' : 'Fehler beim Erstellen';
       document.getElementById('zipErr').textContent = msg;
       return;
     }
@@ -1889,7 +1889,7 @@ function copyCode() {
 // force=true bypasses the 30-min server cache (used on manual badge click).
 async function checkForUpdate(force = false) {
   if (userLevel < 1) return;
-  if (force) showToast('Suche Update …', 'bi-cloud-download', 99999);
+  if (force) showToast('Suche Update \u2026', 'bi-cloud-download', 99999);
   try {
     const url  = '?_checkupdate=1&_t=' + encodeURIComponent(_token) + (force ? '&force=1' : '');
     const res  = await fetch(url);
@@ -1898,10 +1898,10 @@ async function checkForUpdate(force = false) {
     if (data.ok && data.available) {
       const seenKey = 'ws_upd_' + data.latest;
       sessionStorage.setItem(seenKey, '1');
-      document.getElementById('updBannerTxt').textContent = 'Update verfügbar: v' + data.latest;
+      document.getElementById('updBannerTxt').textContent = 'Update verf\u00fcgbar: v' + data.latest;
       document.getElementById('updBanner').classList.add('show');
     } else if (force) {
-      showToast('Kein Update verfügbar', 'bi-check-circle', 2500);
+      showToast('Kein Update verf\u00fcgbar', 'bi-check-circle', 2500);
     }
   } catch { if (force) { hideToast(); showToast('Verbindungsfehler', 'bi-wifi-off', 3000); } }
 }
@@ -1910,7 +1910,7 @@ async function checkForUpdate(force = false) {
 async function triggerUpdate() {
   if (userLevel < 1) return;
   document.getElementById('updBanner')?.classList.remove('show');
-  showToast('Installiere Update …', 'bi-cloud-download', 99999);
+  showToast('Installiere Update \u2026', 'bi-cloud-download', 99999);
   const fd = new FormData();
   fd.append('_t', _token);
   try {
@@ -1918,7 +1918,7 @@ async function triggerUpdate() {
     const data = await res.json();
     hideToast();
     const msgs = {
-      ok:   ['Update installiert! Wird neu geladen …', 'bi-check-circle-fill', 4000],
+      ok:   ['Update installiert! Wird neu geladen \u2026', 'bi-check-circle-fill', 4000],
       err:  ['GitHub nicht erreichbar.',                    'bi-exclamation-triangle', 3000],
       auth: ['Session abgelaufen.',                         'bi-lock', 3000],
       perm: ['Keine Schreibrechte auf index.php',           'bi-shield-x', 4000],
@@ -1942,7 +1942,7 @@ if (userLevel >= 1) {
       const seenKey = 'ws_upd_' + data.latest;
       if (sessionStorage.getItem(seenKey)) return;
       sessionStorage.setItem(seenKey, '1');
-      document.getElementById('updBannerTxt').textContent = 'Update verfügbar: v' + data.latest;
+      document.getElementById('updBannerTxt').textContent = 'Update verf\u00fcgbar: v' + data.latest;
       document.getElementById('updBanner').classList.add('show');
     }).catch(() => {});
   }, 2000);
@@ -1952,8 +1952,8 @@ if (userLevel >= 1) {
 function openCpw(forced) {
   const ttl = document.getElementById('cpwTtl');
   ttl.textContent = forced === false
-    ? 'Passwort ändern'
-    : 'Standard-Passwort ändern — bitte jetzt setzen';
+    ? 'Passwort \u00e4ndern'
+    : 'Standard-Passwort \u00e4ndern \u2014 bitte jetzt setzen';
   document.getElementById('cpwSkip').style.display = forced === false ? '' : 'none';
   document.getElementById('cpwOv').classList.add('open');
   setTimeout(() => document.getElementById('cpwCur').focus(), 50);
@@ -1993,7 +1993,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
   const err = document.getElementById('cpwErr');
   err.textContent = '';
   if (nw.length < 4) { err.textContent = 'Mind. 4 Zeichen'; return; }
-  if (nw !== con)    { err.textContent = 'Passwörter stimmen nicht überein'; return; }
+  if (nw !== con)    { err.textContent = 'Passw\u00f6rter stimmen nicht \u00fcberein'; return; }
   const fd = new FormData();
   fd.append('_t', _token); fd.append('cur', cur); fd.append('new', nw);
   try {
@@ -2001,7 +2001,7 @@ document.getElementById('cpwBtn').addEventListener('click', async () => {
     const data = await res.json();
     if (data.ok) {
       closeCpw();
-      showToast('Passwort geändert', 'bi-check2-circle', 3000);
+      showToast('Passwort ge\u00e4ndert', 'bi-check2-circle', 3000);
     } else {
       err.textContent = data.s === 'wrong' ? 'Aktuelles Passwort falsch'
         : data.s === 'short' ? 'Zu kurz' : 'Fehler';
