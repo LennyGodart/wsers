@@ -30,9 +30,9 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.8.9',
+        '_VER'        => '3.9.1',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
-        '_APP_KEY'    => 'dGVzdDEyMyo=', // admin key (base64)
+        '_APP_KEY' => 'dGVzdDEyMyo=', // admin key (base64)
     ];
     foreach ($defaults as $k => $v) defined($k) || define($k, $v);
     unset($defaults, $k, $v);
