@@ -30,7 +30,7 @@
 // ── Bootstrap: define app-wide constants ────────────────────────────────────
 (static function () {
     $defaults = [
-        '_VER'        => '3.9.1',
+        '_VER'        => '3.9.4',
         '_UPDATE_SRC' => 'https://raw.githubusercontent.com/LennyGodart/wsers/refs/heads/main/index.php',
         '_APP_KEY' => 'dGVzdDEyMyo=', // admin key (base64)
     ];
@@ -685,9 +685,10 @@ function getFilesRecursive(string $dir): array {
 
 /** Human-readable file size. */
 function fmtSize(int $b): string {
-    if ($b < 1024)    return $b . ' B';
-    if ($b < 1048576) return round($b / 1024, 1) . ' KB';
-    return round($b / 1048576, 1) . ' MB';
+    if ($b < 1024)       return $b . ' B';
+    if ($b < 1048576)    return round($b / 1024, 1) . ' KB';
+    if ($b < 1073741824) return round($b / 1048576, 1) . ' MB';
+    return round($b / 1073741824, 2) . ' GB';
 }
 
 /** Returns Bootstrap Icon class for a filename. */
@@ -738,7 +739,8 @@ $breadcrumb = buildBreadcrumb($root, $current);
 $diskFree  = @disk_free_space($root) ?: 0;
 $diskTotal = @disk_total_space($root) ?: 0;
 $diskUsed  = $diskTotal - $diskFree;
-$diskPct   = $diskTotal > 0 ? round($diskUsed / $diskTotal * 100) : 0;
+$diskPct     = $diskTotal > 0 ? round($diskUsed / $diskTotal * 100) : 0;
+$diskFreePct = $diskTotal > 0 ? round($diskFree / $diskTotal * 100) : 0;
 
 ?>
 <!DOCTYPE html>
@@ -759,10 +761,11 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .topbar{position:fixed;top:0;left:0;right:0;height:var(--th);background:var(--top);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;z-index:1000;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .tb-brand{display:flex;align-items:center;gap:.6rem;color:var(--ttxt);font-weight:700;font-size:1.1rem}
 .logo-ico{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff;flex-shrink:0;box-shadow:0 2px 8px rgba(99,102,241,.4)}
-.brand-nm{cursor:pointer;border-radius:5px;padding:2px 6px;transition:background var(--tr);user-select:none;color:var(--ttxt)}
-.brand-nm:hover{background:rgba(255,255,255,.14)}
+.brand-nm{cursor:default;border-radius:5px;padding:2px 6px;transition:background var(--tr);user-select:none;color:var(--ttxt)}
+.level-1 .brand-nm,.level-2 .brand-nm{cursor:pointer}
+.level-1 .brand-nm:hover,.level-2 .brand-nm:hover{background:rgba(255,255,255,.14)}
 .brand-nm::after{content:'\270E';font-size:.6rem;margin-left:.3rem;opacity:0;transition:opacity var(--tr);vertical-align:super}
-.brand-nm:hover::after{opacity:.5}
+.level-1 .brand-nm:hover::after,.level-2 .brand-nm:hover::after{opacity:.5}
 .brand-inp{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.35);border-radius:5px;color:var(--ttxt);font-size:1.05rem;font-weight:700;width:150px;padding:2px 7px;outline:none;transition:border-color var(--tr)}
 .brand-inp:focus{border-color:rgba(255,255,255,.6)}
 .tb-right{display:flex;align-items:center;gap:.6rem}
@@ -959,7 +962,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 @media(max-width:540px){:root{--sw:0px}.sidebar{display:none}.sort-btns{display:none}}
 .disk-badge{gap:.5rem}
 .disk-bar-wrap{width:52px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
-.disk-bar-fill{height:100%;background:linear-gradient(90deg,#6366f1,#818cf8);border-radius:3px;transition:width .4s}
+.disk-bar-fill{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#818cf8);border-radius:3px;transition:width .4s}
 .pw-strength{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;margin-top:.15rem;min-height:18px}
 .pw-str-track{flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
 .pw-str-fill{height:100%;border-radius:2px;transition:width .3s,background .3s;width:0}
@@ -1058,10 +1061,10 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
       <span class="sbadge"><i class="bi bi-file-earmark"></i> <?= $otherCount ?> Weitere</span>
       <?php endif; ?>
       <?php if ($viewLevel >= 1 && $diskTotal > 0): ?>
-      <span class="sbadge disk-badge" title="<?= fmtSize((int)$diskUsed) ?> von <?= fmtSize((int)$diskTotal) ?> belegt">
+      <span class="sbadge disk-badge" title="<?= $diskPct ?>% belegt (<?= fmtSize((int)$diskUsed) ?> von <?= fmtSize((int)$diskTotal) ?>)">
         <i class="bi bi-hdd"></i>
-        <span class="disk-bar-wrap"><span class="disk-bar-fill" style="width:<?= $diskPct ?>%"></span></span>
-        <?= fmtSize((int)$diskFree) ?> frei
+        <span class="disk-bar-wrap"><span class="disk-bar-fill" style="width:<?= $diskFreePct ?>%;background:<?= $diskPct>85?'#ef4444':($diskPct>60?'#f59e0b':'#22c55e') ?>"></span></span>
+        <?= fmtSize((int)$diskFree) ?> / <?= fmtSize((int)$diskTotal) ?>
       </span>
       <?php endif; ?>
     </div>
@@ -1319,17 +1322,10 @@ document.querySelector('.sidebar')?.addEventListener('click', e => {
   zipFolderDirect(btn.dataset.fzip, btn.dataset.fname);
 });
 
-// ── Editable brand name ──────────────────────────────────────────────────────
-(function () {
-  const stored = localStorage.getItem('ws_brand');
-  if (stored && document.getElementById('brandNm').textContent === 'UserName') {
-    document.getElementById('brandNm').textContent = stored;
-    document.title = stored + ' \u00B7 Explorer';
-  }
-})();
+// ── Editable brand name (Owner+ only, persists in .wsconfig) ─────────────────
 document.querySelector('.tb-brand').addEventListener('click', e => {
   const tgt = e.target.closest('#brandNm');
-  if (!tgt) return;
+  if (!tgt || userLevel < 1) return;
   const inp = document.createElement('input');
   inp.type = 'text'; inp.value = tgt.textContent;
   inp.className = 'brand-inp'; inp.maxLength = 30;
@@ -1337,18 +1333,15 @@ document.querySelector('.tb-brand').addEventListener('click', e => {
   let done = false;
   function save() {
     if (done) return; done = true;
-    const val = inp.value.trim() || 'UserName';
-    localStorage.setItem('ws_brand', val);
-    document.title = val + ' \u00B7 Explorer';
+    const val = inp.value.trim() || tgt.textContent;
+    document.title = val + ' · Explorer';
     const sp = document.createElement('span');
     sp.id = 'brandNm'; sp.className = 'brand-nm';
     sp.title = 'Klicken zum Umbenennen'; sp.textContent = val;
     inp.replaceWith(sp);
-    if (userLevel >= 1) {
-      const fd = new FormData();
-      fd.append('_t', _token); fd.append('n', val);
-      fetch('?_setbrand=1', { method: 'POST', body: fd }).catch(() => {});
-    }
+    const fd = new FormData();
+    fd.append('_t', _token); fd.append('n', val);
+    fetch('?_setbrand=1', { method: 'POST', body: fd }).catch(() => {});
   }
   inp.addEventListener('blur', save);
   inp.addEventListener('keydown', e => {
@@ -1406,8 +1399,9 @@ function openLogin() {
 function applyLevel(lvl, announce) {
   userLevel = lvl;
   _mc.classList.remove('level-1', 'level-2');
-  if (lvl >= 1) _mc.classList.add('level-1');
-  if (lvl >= 2) _mc.classList.add('level-2');
+  document.body.classList.remove('level-1', 'level-2');
+  if (lvl >= 1) { _mc.classList.add('level-1'); document.body.classList.add('level-1'); }
+  if (lvl >= 2) { _mc.classList.add('level-2'); document.body.classList.add('level-2'); }
 
   const badge  = document.getElementById('lvlBadge');
   const txt    = document.getElementById('lvlTxt');
@@ -1863,17 +1857,30 @@ function closeImg() {
   document.getElementById('imgOv').classList.remove('open');
   setTimeout(() => { document.getElementById('imgEl').src = ''; }, 200);
 }
-async function copyCode() {
-  const btn = document.getElementById('cpBtn');
-  try {
-    await navigator.clipboard.writeText(document.getElementById('cdEl').textContent);
+function copyCode() {
+  const btn  = document.getElementById('cpBtn');
+  const text = document.getElementById('cdEl').textContent;
+  const ta   = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;width:1px;height:1px';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  document.body.removeChild(ta);
+  if (ok) {
     btn.innerHTML = '<i class="bi bi-check2"></i> Kopiert!';
     btn.style.cssText = 'background:#166534;color:#bbf7d0';
-  } catch {
-    btn.innerHTML = '<i class="bi bi-x"></i> Fehler';
-    btn.style.cssText = 'background:#7f1d1d;color:#fca5a5';
+    setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
+  } else {
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById('cdEl'));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    btn.innerHTML = '<i class="bi bi-clipboard"></i> Strg+C';
+    btn.style.cssText = 'background:#1e3a5f;color:#93c5fd';
+    setTimeout(() => { window.getSelection()?.removeAllRanges(); btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 3000);
   }
-  setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> Kopieren'; btn.style.cssText = ''; }, 2000);
 }
 
 // ── Update check + install ────────────────────────────────────────────────────
